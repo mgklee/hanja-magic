@@ -54,15 +54,20 @@ class _Tab2State extends State<Tab2> {
     );
     if (app.isNotEmpty) {
       setState(() {
-        registeredApps.add(app);
+        registeredApps.add(app); // 검색된 앱을 registeredApps에 추가
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('App ${app['name']} added!')),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('앱 이름을 찾을 수 없습니다.')),
+        SnackBar(content: Text('App not found: $name')),
       );
     }
-    nameController.clear();
+    nameController.clear(); // 입력 필드 초기화
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -130,43 +135,18 @@ class _Tab2State extends State<Tab2> {
     );
   }
 
-  // 앱 실행 함수
-  void _launchKakaoTalk() async {
-    final intent = AndroidIntent(
-      action: 'android.intent.action.MAIN',
-      package: 'com.kakao.talk',
-      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
-    );
-    await intent.launch();
-  }
 
-  void _launchGallery() async {
-    const packageName = 'com.sec.android.gallery3d';
-    final intent = AndroidIntent(
-      action: 'android.intent.action.MAIN',
-      package: packageName,
-      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
-    );
-    await intent.launch();
-  }
-
-  void _launchChrome() {
-    final intent = AndroidIntent(
-      action: 'android.intent.action.MAIN',
-      category: 'android.intent.category.LAUNCHER',
-      package: 'com.android.chrome',
-      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
-    );
-    intent.launch();
-  }
-
-  void _launchApp(String packageName) {
-    final intent = AndroidIntent(
-      action: 'android.intent.action.MAIN',
-      package: packageName,
-      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
-    );
-    intent.launch();
+  Future<void> _launchApp(String packageName) async {
+    try {
+      final success = await platform.invokeMethod('launchApp', {'packageName': packageName});
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to launch app: $packageName')),
+        );
+      }
+    } on PlatformException catch (e) {
+      print("Failed to launch app: ${e.message}");
+    }
   }
 
   // 카메라 실행 함수

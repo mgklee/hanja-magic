@@ -1,8 +1,6 @@
 package com.example.hanja_magic
 
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
@@ -13,37 +11,59 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
-            MethodChannel(messenger, CHANNEL).setMethodCallHandler { call, result ->
-                if (call.method == "getInstalledApps") {
-                    val apps = getInstalledApps()
-                    result.success(apps)
-                } else {
-                    result.notImplemented()
+            // Null 가능성 확인 후 안전하게 처리
+            val binaryMessenger = flutterEngine?.dartExecutor?.binaryMessenger
+                if (binaryMessenger != null) {
+                    MethodChannel(binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+                        when (call.method) {
+                            "getInstalledApps" -> {
+                                val apps = getInstalledApps()
+                                result.success(apps)
+                            }
+                            "launchApp" -> {
+                                val packageName = call.argument<String>("packageName")
+                                if (packageName != null) {
+                                    val success = launchApp(packageName)
+                                    result.success(success)
+                                } else {
+                                    result.error("INVALID_PACKAGE", "Invalid package name.", null)
+                                }
+                            }
+                            else -> result.notImplemented()
+                        }
+                    }
                 }
-            }
-        }
     }
 
     private fun getInstalledApps(): List<Map<String, String>> {
         val pm: PackageManager = packageManager
-        val intent = Intent(Intent.ACTION_MAIN, null)
-        intent.addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = mutableListOf<Map<String, String>>()
 
-        val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
-        val installedApps = mutableListOf<Map<String, String>>()
-
-        for (app in apps) {
-            val appName = app.loadLabel(pm).toString()
-            val packageName = app.activityInfo.packageName
-            installedApps.add(
-                mapOf(
-                    "name" to appName,
-                    "package" to packageName
+        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        for (packageInfo in packages) {
+            val packageName = packageInfo.packageName
+            val launchIntent = pm.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                val appName = pm.getApplicationLabel(packageInfo).toString()
+                apps.add(
+                    mapOf(
+                        "name" to appName,
+                        "package" to packageName
+                    )
                 )
-            )
+            }
         }
 
-        return installedApps
+        return apps
+    }
+
+    private fun launchApp(packageName: String): Boolean {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        return if (launchIntent != null) {
+            startActivity(launchIntent)
+            true
+        } else {
+            false
+        }
     }
 }
