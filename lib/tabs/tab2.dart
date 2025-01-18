@@ -21,7 +21,7 @@ class _Tab2State extends State<Tab2> {
 
   final List<Map<String, String>> fixedApps = [
     {'name': 'Chrome', 'package': 'com.android.chrome'},
-    {'name': 'YouTube', 'package': 'com.google.android.youtube'},
+    {'name': '카카오톡', 'package': 'com.kakao.talk'},
     {'name': 'Gmail', 'package': 'com.google.android.gm'},
   ];
 
@@ -67,6 +67,18 @@ class _Tab2State extends State<Tab2> {
     nameController.clear(); // 입력 필드 초기화
   }
 
+  Future<void> _launchApp(String packageName) async {
+    try {
+      final success = await platform.invokeMethod('launchApp', {'packageName': packageName});
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to launch app: $packageName')),
+        );
+      }
+    } on PlatformException catch (e) {
+      print("Failed to launch app: ${e.message}");
+    }
+  }
 
 
   @override
@@ -99,72 +111,59 @@ class _Tab2State extends State<Tab2> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'App Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () => _addApp(nameController.text),
-                  child: Text('Add App'),
-                ),
-              ],
-            ),
-          ),
+
         ],
       ),
-    );
-  }
-
-  Widget _buildAppCard(BuildContext context, {required IconData icon, required String label, required VoidCallback onTap}) {
-    return Card(
-      color: const Color(0xFFF7F7F7),
-      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: ListTile(
-        leading: Icon(icon, size: 40.0, color: const Color(0xFF18C971)),
-        title: Text(label, style: const TextStyle(fontSize: 16.0)),
-        onTap: onTap,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AddAppDialog(
+                onAddApp: _addApp,
+              );
+            },
+          );
+        },
+        child: Icon(Icons.add),
       ),
     );
   }
+}
 
+class AddAppDialog extends StatelessWidget {
+  final Function(String) onAddApp;
 
-  Future<void> _launchApp(String packageName) async {
-    try {
-      final success = await platform.invokeMethod('launchApp', {'packageName': packageName});
-      if (!success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to launch app: $packageName')),
-        );
-      }
-    } on PlatformException catch (e) {
-      print("Failed to launch app: ${e.message}");
-    }
-  }
+  AddAppDialog({required this.onAddApp});
 
-  // 카메라 실행 함수
-  Future<void> _launchCamera() async {
-    final intent = AndroidIntent(
-      action: 'android.media.action.IMAGE_CAPTURE',
-      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
+  @override
+  Widget build(BuildContext context) {
+    TextEditingController nameController = TextEditingController();
+
+    return AlertDialog(
+      title: Text('앱 추가하기'),
+      content: TextField(
+        controller: nameController,
+        decoration: InputDecoration(hintText: '앱 이름 입력'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            String appName = nameController.text.trim();
+            if (appName.isNotEmpty) {
+              onAddApp(appName); // 콜백 호출
+              Navigator.of(context).pop();
+            }
+          },
+          child: Text('추가'),
+        ),
+      ],
     );
-    await intent.launch();
-  }
-
-  // 전화 앱 실행 함수
-  Future<void> _makeCall(String phoneNumber) async {
-    final intent = AndroidIntent(
-      action: 'android.intent.action.DIAL',
-      data: phoneNumber,
-      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
-    );
-    await intent.launch();
   }
 }
