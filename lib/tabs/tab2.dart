@@ -4,108 +4,114 @@ import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/services.dart';
 
 
+
 class Tab2 extends StatefulWidget {
   const Tab2({super.key});
 
   @override
   _Tab2State createState() => _Tab2State();
 }
+/////
+/////
+/////
+/////
 
 class _Tab2State extends State<Tab2> {
-  Map<String, dynamic> routines = {};
+  static const platform = MethodChannel('com.example.hanja_magic/apps');
+
+  final List<Map<String, String>> fixedApps = [
+    {'name': 'Chrome', 'package': 'com.android.chrome'},
+    {'name': 'YouTube', 'package': 'com.google.android.youtube'},
+    {'name': 'Gmail', 'package': 'com.google.android.gm'},
+  ];
+
+  List<Map<String, String>> installedApps = [];
+  List<Map<String, String>> registeredApps = [];
+
+  final TextEditingController nameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchInstalledApps();
+  }
+
+  Future<void> _fetchInstalledApps() async {
+    try {
+      final List<dynamic> apps = await platform.invokeMethod('getInstalledApps');
+      setState(() {
+        installedApps = apps.map((app) => Map<String, String>.from(app)).toList();
+      });
+    } on PlatformException catch (e) {
+      print("Failed to load installed apps: ${e.message}");
+    }
+  }
+
+  void _addApp(String name) {
+    final app = installedApps.firstWhere(
+          (app) => app['name']!.toLowerCase() == name.toLowerCase(),
+      orElse: () => {},
+    );
+    if (app.isNotEmpty) {
+      setState(() {
+        registeredApps.add(app);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('앱 이름을 찾을 수 없습니다.')),
+      );
+    }
+    nameController.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('App Launcher'),
+      ),
+      body: Column(
         children: [
-
-          // 카카오톡 실행 버튼
-          _buildAppCard(
-            context,
-            icon: Icons.message,
-            label: "Open KakaoTalk",
-            onTap: () => _launchApp('com.kakao.talk'),
+          Expanded(
+            child: ListView(
+              children: [
+                // 고정된 버튼 리스트
+                ...fixedApps.map((app) {
+                  return ListTile(
+                    title: Text(app['name']!),
+                    onTap: () => _launchApp(app['package']!),
+                  );
+                }).toList(),
+                Divider(), // 구분선
+                // 사용자가 추가한 앱 리스트
+                ...registeredApps.map((app) {
+                  return ListTile(
+                    title: Text(app['name']!),
+                    subtitle: Text(app['package']!),
+                    onTap: () => _launchApp(app['package']!),
+                  );
+                }).toList(),
+              ],
+            ),
           ),
-          // 카메라 실행 버튼
-          _buildAppCard(
-            context,
-            icon: Icons.camera_alt,
-            label: "Open Camera",
-            onTap: () => _launchCamera(),
-          ),
-          // 갤러리 실행 버튼
-          _buildAppCard(
-            context,
-            icon: Icons.photo,
-            label: "Open Gallery",
-            onTap: () => _launchApp('com.sec.android.gallery3d'),
-          ),
-          // 크롬 실행 버튼
-          _buildAppCard(
-            context,
-            icon: Icons.web,
-            label: "Open Chrome",
-            onTap: () => _launchApp('com.android.chrome'),
-          ),
-          // 전화 앱 실행 버튼
-          _buildAppCard(
-            context,
-            icon: Icons.phone,
-            label: "Make a Call",
-            onTap: () => _makeCall("tel:+8201086415372"),
-          ),
-
-
-          // Categories List
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: routines.length + 1, // Extra card for the (+) button
-            itemBuilder: (context, index) {
-              // (+) Button Card
-              if (index == routines.length) {
-                return Card(
-                  color: Color(0xFFF7F7F7),
-                  margin: const EdgeInsets.symmetric(
-                      vertical: 8.0, horizontal: 16.0),
-                  child: Center(
-                    child: InkWell(
-                      onTap: () {
-                        // Add a new empty category with a unique name
-                        setState(() {
-                          int routineIndex = 1;
-                          String newRoutineName;
-                          do {
-                            newRoutineName = "루틴 $routineIndex";
-                            routineIndex++;
-                          } while (routines.containsKey(newRoutineName));
-
-                          routines[newRoutineName] = newRoutineName;
-                        });
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Icon(
-                          Icons.add, size: 40.0, color: Color(0xFF18C971)
-                        ),
-                      ),
-                    ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'App Name',
+                    border: OutlineInputBorder(),
                   ),
-                );
-              }
-
-              return Card(
-                color: Color(0xFFF7F7F7),
-                margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                child: Column(
-                  children: [
-                    Text(routines.keys.elementAt(index)),
-                  ],
                 ),
-              );
-            },
+                SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () => _addApp(nameController.text),
+                  child: Text('Add App'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
