@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/services.dart';
-
-
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Tab2 extends StatefulWidget {
   const Tab2({super.key});
@@ -11,10 +10,6 @@ class Tab2 extends StatefulWidget {
   @override
   _Tab2State createState() => _Tab2State();
 }
-/////
-/////
-/////
-/////
 
 class _Tab2State extends State<Tab2> {
   static const platform = MethodChannel('com.example.hanja_magic/apps');
@@ -25,15 +20,31 @@ class _Tab2State extends State<Tab2> {
     {'name': 'Gmail', 'package': 'com.google.android.gm'},
   ];
 
+  final List<String> _apps = [];
   List<Map<String, String>> installedApps = [];
-  List<Map<String, String>> registeredApps = [];
-
   final TextEditingController nameController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _fetchInstalledApps();
+    _loadApps();
+  }
+
+  Future<void> _loadApps() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String>? savedApps = prefs.getStringList('apps');
+    if (savedApps != null) {
+      setState(() {
+        _apps.clear();
+        _apps.addAll(savedApps);
+      });
+    }
+  }
+
+  Future<void> _saveApps() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('apps', _apps);
   }
 
   Future<void> _fetchInstalledApps() async {
@@ -47,15 +58,16 @@ class _Tab2State extends State<Tab2> {
     }
   }
 
-  void _addApp(String name) {
+  void _addApp(String name) async {
     final app = installedApps.firstWhere(
           (app) => app['name']!.toLowerCase() == name.toLowerCase(),
       orElse: () => {},
     );
     if (app.isNotEmpty) {
       setState(() {
-        registeredApps.add(app); // 검색된 앱을 registeredApps에 추가
+        _apps.add(app['name']!);
       });
+      await _saveApps();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('App ${app['name']} added!')),
       );
@@ -64,7 +76,7 @@ class _Tab2State extends State<Tab2> {
         SnackBar(content: Text('App not found: $name')),
       );
     }
-    nameController.clear(); // 입력 필드 초기화
+    nameController.clear();
   }
 
   Future<void> _launchApp(String packageName) async {
@@ -80,6 +92,42 @@ class _Tab2State extends State<Tab2> {
     }
   }
 
+  void deleteAppDialog(BuildContext context, String appName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('$appName 삭제하겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _deleteApp(appName);
+                Navigator.of(context).pop();
+              },
+              child: Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteApp(String appName) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _apps.remove(appName);
+    });
+    await prefs.setStringList('apps', _apps);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$appName 삭제되었습니다.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,26 +140,35 @@ class _Tab2State extends State<Tab2> {
           Expanded(
             child: ListView(
               children: [
-                // 고정된 버튼 리스트
                 ...fixedApps.map((app) {
                   return ListTile(
                     title: Text(app['name']!),
                     onTap: () => _launchApp(app['package']!),
                   );
                 }).toList(),
-                Divider(), // 구분선
-                // 사용자가 추가한 앱 리스트
-                ...registeredApps.map((app) {
+                Divider(),
+                ..._apps.map((appName) {
+                  final app = installedApps.firstWhere(
+                        (app) => app['name'] == appName,
+                    orElse: () => {'name': appName, 'package': ''},
+                  );
                   return ListTile(
                     title: Text(app['name']!),
                     subtitle: Text(app['package']!),
-                    onTap: () => _launchApp(app['package']!),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () {
+                        deleteAppDialog(context, appName);
+                      },
+                    ),
+                    onTap: app['package']!.isNotEmpty
+                        ? () => _launchApp(app['package']!)
+                        : null,
                   );
                 }).toList(),
               ],
             ),
           ),
-
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -157,7 +214,7 @@ class AddAppDialog extends StatelessWidget {
           onPressed: () {
             String appName = nameController.text.trim();
             if (appName.isNotEmpty) {
-              onAddApp(appName); // 콜백 호출
+              onAddApp(appName);
               Navigator.of(context).pop();
             }
           },
