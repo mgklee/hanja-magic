@@ -1,111 +1,108 @@
 package com.example.hanja_magic
 
 import android.content.pm.PackageManager
-import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
+import android.os.Bundle
 import android.util.Base64
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.util.Log
-
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.hanja_magic/apps"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-            // Null 가능성 확인 후 안전하게 처리
-            val binaryMessenger = flutterEngine?.dartExecutor?.binaryMessenger
-                if (binaryMessenger != null) {
-                    MethodChannel(binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
-                        when (call.method) {
-                            "getInstalledApps" -> {
-                                val apps = getInstalledApps()
-                                result.success(apps)
-                            }
-                            "launchApp" -> {
-                                val packageName = call.argument<String>("packageName")
-                                if (packageName != null) {
-                                    val success = launchApp(packageName)
-                                    result.success(success)
-                                } else {
-                                    result.error("INVALID_PACKAGE", "Invalid package name.", null)
-                                }
-                            }
-                            else -> result.notImplemented()
-                        }
-                    }
-                }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "getInstalledApps") {
-                result.success(getInstalledApps())
+            when (call.method) {
+                "getInstalledAppNames" -> {
+                    val names = getInstalledAppNames()
+                    result.success(names)
+                }
+                "getSingleAppInfoByName" -> {
+                    val name = call.argument<String>("appName")
+                    if (name != null) {
+                        val info = getSingleAppInfoByName(name)
+                        if (info != null) {
+                            result.success(info)
+                        } else {
+                            result.error("NOT_FOUND", "No matching app found for $name", null)
+                        }
+                    } else {
+                        result.error("INVALID_NAME", "App name is null or invalid.", null)
+                    }
+                }
+                "launchApp" -> {
+                    val packageName = call.argument<String>("packageName")
+                    if (packageName != null) {
+                        val success = launchApp(packageName)
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_PACKAGE", "Package name is null or invalid.", null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
     }
 
-    private fun getInstalledApps(): List<Map<String, String>> {
-        val pm: PackageManager = packageManager
-        val apps = mutableListOf<Map<String, String>>()
-
+    private fun getInstalledAppNames(): List<String> {
+        val pm = packageManager
+        val list = mutableListOf<String>()
         val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-        for (packageInfo in packages) {
-            val packageName = packageInfo.packageName
-            val launchIntent = pm.getLaunchIntentForPackage(packageName)
-            val icon = packageInfo.loadIcon(pm)
-
-            // Convert icon to Base64
-            val iconBase64 = try {
-                val drawable = packageInfo.loadIcon(pm)
-                val bitmap = if (drawable is BitmapDrawable) {
-                    drawable.bitmap
-                } else {
-                    // 다른 Drawable 타입의 경우 비트맵으로 변환
-                    val bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(bitmap)
-                    drawable.setBounds(0, 0, canvas.width, canvas.height)
-                    drawable.draw(canvas)
-                    bitmap
-                }
-
-                // 비트맵을 Base64로 변환
-                val outputStream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-                Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-            } catch (e: Exception) {
-                Log.e("AppIconError", "Failed to process icon for ${packageInfo.packageName}: ${e.message}")
-                null
-            }
-
-            Log.d("Base64Debug", "Base64 Icon Data: ${iconBase64?.take(100)}")
-
+        for (pkg in packages) {
+            val launchIntent = pm.getLaunchIntentForPackage(pkg.packageName)
             if (launchIntent != null) {
-                val appName = pm.getApplicationLabel(packageInfo).toString()
-                apps.add(
-                    mapOf(
-                        "name" to appName,
-                        "package" to packageName,
-                        "icon" to (iconBase64 ?: "")
-                    )
-                )
+                val appName = pm.getApplicationLabel(pkg).toString()
+                list.add(appName)
             }
         }
+        return list
+    }
 
-        return apps
+    private fun getSingleAppInfoByName(appName: String): Map<String, String>? {
+        val pm = packageManager
+        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        for (pkg in packages) {
+            val launchIntent = pm.getLaunchIntentForPackage(pkg.packageName)
+            if (launchIntent != null) {
+                val name = pm.getApplicationLabel(pkg).toString()
+                if (name.equals(appName, ignoreCase = true)) {
+                    val iconDrawable = pm.getApplicationIcon(pkg.packageName)
+                    val bitmap = if (iconDrawable is BitmapDrawable) {
+                        iconDrawable.bitmap
+                    } else {
+                        val b = Bitmap.createBitmap(iconDrawable.intrinsicWidth, iconDrawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
+                        val c = Canvas(b)
+                        iconDrawable.setBounds(0, 0, c.width, c.height)
+                        iconDrawable.draw(c)
+                        b
+                    }
+                    val outputStream = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                    val iconBase64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                    return mapOf(
+                        "name" to name,
+                        "package" to pkg.packageName,
+                        "icon" to iconBase64
+                    )
+                }
+            }
+        }
+        return null
     }
 
     private fun launchApp(packageName: String): Boolean {
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-        return if (launchIntent != null) {
-            startActivity(launchIntent)
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+        return if (intent != null) {
+            startActivity(intent)
             true
         } else {
             false
