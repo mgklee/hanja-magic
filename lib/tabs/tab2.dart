@@ -71,7 +71,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     await prefs.setStringList('appsData', data);
   }
 
-  Future<void> _addApp(String appName) async {
+  Future<void> _addApp(String appName, String hanja, String spell, String meaning, String reading, String data) async {
     if (!installedAppNames.any(
             (name) => name.toLowerCase() == appName.toLowerCase())) {
       ScaffoldMessenger.of(context)
@@ -91,6 +91,10 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           'name': name,
           'package': packageName,
           'icon': iconBase64,
+          'hanja': hanja,
+          'spell': spell,
+          'meaning': reading,
+          //'data': data,
         });
       });
       await _saveApps();
@@ -141,6 +145,80 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           });
         }
 
+        void showHanjaDialog(String appName) {
+          TextEditingController hanjaController = TextEditingController();
+          TextEditingController meaningController = TextEditingController();
+          TextEditingController readingController = TextEditingController();
+          TextEditingController spellController = TextEditingController();
+
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return Dialog(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Add details for $appName',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: hanjaController,
+                        decoration: InputDecoration(
+                          labelText: 'Enter Hanja',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: meaningController,
+                        decoration: InputDecoration(
+                          labelText: 'Enter Meaning',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: readingController,
+                        decoration: InputDecoration(
+                          labelText: 'Enter Reading',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: spellController,
+                        decoration: InputDecoration(
+                          labelText: 'Enter Spell',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close Hanja Dialog
+                          _addApp(
+                            appName,
+                            hanjaController.text.trim(),
+                            meaningController.text.trim(),
+                            readingController.text.trim(),
+                            spellController.text.trim(),
+                            "",
+                          );
+                        },
+                        child: Text('Save Details'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
             return Dialog(
@@ -183,12 +261,12 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                       onPressed: () {
                         final name = searchController.text.trim();
                         searchController.clear();
-                        Navigator.pop(context);
                         if (name.isNotEmpty) {
-                          _addApp(name);
+                          Navigator.pop(context);
+                          showHanjaDialog(name);
                         }
                       },
-                      child: Text('Add App'),
+                      child: Text('Next'),
                     ),
                   ],
                 ),
