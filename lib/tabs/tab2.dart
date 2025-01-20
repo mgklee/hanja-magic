@@ -55,6 +55,8 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   Future<void> _loadApps() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getStringList('appsData');
+
+
     if (data != null) {
       final list = data.map((jsonStr) {
         final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -71,7 +73,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     await prefs.setStringList('appsData', data);
   }
 
-  Future<void> _addApp(String appName, String hanja, String spell, String meaning, String reading, String data) async {
+  Future<void> _addApp(String appName, String hanja, String spell, String meaning, String reading, String additivedata) async {
     if (!installedAppNames.any(
             (name) => name.toLowerCase() == appName.toLowerCase())) {
       ScaffoldMessenger.of(context)
@@ -93,8 +95,9 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           'icon': iconBase64,
           'hanja': hanja,
           'spell': spell,
-          'meaning': reading,
-          //'data': data,
+          'meaning': meaning,
+          'reading': reading,
+          'data': additivedata,
         });
       });
       await _saveApps();
@@ -126,6 +129,28 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
         .showSnackBar(SnackBar(content: Text('$appName 삭제되었습니다.')));
   }
 
+  void _showDeleteDialog(String appName) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('$appName 삭제하겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteApp(appName);
+            },
+            child: Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void showAppSearchDialog(BuildContext context) async {
     // 설치된 앱 리스트 가져오기
     List<String> installedApps = await installedAppNames;
@@ -145,6 +170,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           });
         }
 
+        // 두 번째 단계 - 한자 고르기
         void showHanjaDialog(String appName) {
           TextEditingController hanjaController = TextEditingController();
           TextEditingController meaningController = TextEditingController();
@@ -202,10 +228,10 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                           Navigator.of(context).pop(); // Close Hanja Dialog
                           _addApp(
                             appName,
-                            hanjaController.text.trim(),
-                            meaningController.text.trim(),
-                            readingController.text.trim(),
-                            spellController.text.trim(),
+                            hanjaController.text,
+                            spellController.text,
+                            meaningController.text,
+                            readingController.text,
                             "",
                           );
                         },
@@ -278,37 +304,12 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  void _showDeleteDialog(String appName) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('$appName 삭제하겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _deleteApp(appName);
-            },
-            child: Text('확인'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // build에 super.build(context) 호출 필요
   // (AutomaticKeepAliveClientMixin을 사용할 때 권장)
   @override
   Widget build(BuildContext context) {
     super.build(context); // 추가
     return Scaffold(
-      appBar: AppBar(
-        title: Text('App Launcher'),
-      ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
           : Column(
@@ -324,19 +325,18 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                   ),
                 Divider(),
                 for (final app in _apps)
-                  ListTile(
-                    leading: _buildIcon(app['icon'] ?? ''),
-                    title: Text(app['name'] ?? ''),
-                    subtitle: Text(app['package'] ?? ''),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () =>
-                          _showDeleteDialog(app['name'] ?? ''),
-                    ),
+                  CustomListTile(
+                    hanja: app['hanja'] ?? '',
+                    spell: app['spell'] ?? '',
+                    meaning: app['meaning'] ?? '',
+                    reading: app['reading'] ?? '',
+                    icon1: _buildIcon(app['icon'] ?? ''),
+                    icon2: Icon(Icons.delete),
                     onTap: (app['package'] ?? '').isNotEmpty
                         ? () => _launchApp(app['package']!)
                         : null,
-                  ),
+                    onDelete: () => _showDeleteDialog(app['name'] ?? ''),
+                  )
               ],
             ),
           ),
@@ -363,78 +363,61 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   }
 }
 
-class AppSearchDialog extends StatefulWidget {
-  final List<String> appList;
+class CustomListTile extends StatelessWidget {
+  final String hanja;
+  final String spell;
+  final String meaning;
+  final String reading;
+  final Widget icon1;
+  final Widget icon2;
+  final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
-  AppSearchDialog({required this.appList});
-
-  @override
-  _AppSearchDialogState createState() => _AppSearchDialogState();
-}
-
-class _AppSearchDialogState extends State<AppSearchDialog> {
-  TextEditingController _searchController = TextEditingController();
-  List<String> _filteredApps = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredApps = widget.appList; // 초기 상태는 전체 앱 표시
-    _searchController.addListener(_filterApps);
-  }
-
-  void _filterApps() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredApps = widget.appList
-          .where((app) => app.toLowerCase().contains(query))
-          .toList();
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+  CustomListTile({
+    required this.hanja,
+    required this.spell,
+    required this.meaning,
+    required this.reading,
+    required this.icon1,
+    required this.icon2,
+    this.onTap,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
+    return InkWell(
+      onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Search App',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 10),
+            // Leading
+            Text(hanja, style: TextStyle(fontSize: 30)),
+
+            // Title1, Title2, Title3 in Column
             Expanded(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _filteredApps.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(_filteredApps[index]),
-                    onTap: () {
-                      _searchController.text = _filteredApps[index];
-                    },
-                  );
-                },
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(spell, style: TextStyle(fontSize: 24)),
+                  Text(meaning, style: TextStyle(fontSize: 26)),
+                  Text(reading, style: TextStyle(fontSize: 26)),
+                ],
               ),
             ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () {
-                // 검색창의 텍스트로 앱 추가
-                Navigator.of(context).pop(_searchController.text);
-              },
-              child: Text('Add App'),
+
+            // Trailing Icons
+            Row(
+              children: [
+                icon1,
+                SizedBox(width: 8.0),
+                IconButton(
+                  icon: icon2,
+                  onPressed: onDelete,
+                ),
+              ],
             ),
           ],
         ),
@@ -442,3 +425,5 @@ class _AppSearchDialogState extends State<AppSearchDialog> {
     );
   }
 }
+
+
