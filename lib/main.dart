@@ -1,13 +1,69 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 import 'tabs/tab1.dart';
 import 'tabs/tab2.dart';
 
 void main() async {
-  runApp(MyApp());
+  late Map<String, dynamic> dict;
+  late Map<String, dynamic> smp2trd;
+  late Interpreter interpreter;
+  late List<String> labels;
+
+  // Ensures async operations work before runApp
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    final jsonString = await rootBundle.loadString('assets/dict.json');
+    dict = json.decode(jsonString);
+  } catch (e) {
+    print("Error loading dictionary: $e");
+  }
+
+  try {
+    final jsonString = await rootBundle.loadString('assets/smp2trd.json');
+    smp2trd = json.decode(jsonString);
+  } catch (e) {
+    print("Error loading smp2trd: $e");
+  }
+
+  try {
+    interpreter = await Interpreter.fromAsset('assets/model.tflite');
+  } catch (e) {
+    print("Error loading model: $e");
+  }
+
+  try {
+    final labelsData = await rootBundle.loadString('assets/labels.txt');
+    labels = labelsData.split('\n'); // Directly assign the labels
+  } catch (e) {
+    print("Error loading labels: $e");
+  }
+
+  runApp(
+    MyApp(
+      dict: dict,
+      smp2trd: smp2trd,
+      interpreter: interpreter,
+      labels: labels,
+    )
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Map<String, dynamic> dict;
+  final Map<String, dynamic> smp2trd;
+  final Interpreter interpreter;
+  final List<String> labels;
+
+  const MyApp({
+    super.key,
+    required this.dict,
+    required this.smp2trd,
+    required this.interpreter,
+    required this.labels,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -18,13 +74,29 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         splashColor: Colors.transparent,
       ),
-      home: HomePage(),
+      home: HomePage(
+        dict: dict,
+        smp2trd: smp2trd,
+        interpreter: interpreter,
+        labels: labels,
+      ),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final Map<String, dynamic> dict;
+  final Map<String, dynamic> smp2trd;
+  final Interpreter interpreter;
+  final List<String> labels;
+
+  const HomePage({
+    super.key,
+    required this.dict,
+    required this.smp2trd,
+    required this.interpreter,
+    required this.labels,
+  });
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -36,7 +108,12 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> tabs = [
-      Tab1(),
+      Tab1(
+        dict: widget.dict,
+        smp2trd: widget.smp2trd,
+        interpreter: widget.interpreter,
+        labels: widget.labels,
+      ),
       Tab2(),
     ];
 
@@ -55,8 +132,6 @@ class _HomePageState extends State<HomePage> {
             _currentIndex = index;
           });
         },
-        // unselectedIconTheme: IconThemeData(color: Colors.white),
-        // selectedIconTheme: IconThemeData(color: Colors.deepOrange),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.draw),

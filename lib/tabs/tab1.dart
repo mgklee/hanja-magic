@@ -1,14 +1,25 @@
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'dart:convert';
 import 'package:image/image.dart' as img;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class Tab1 extends StatefulWidget {
-  const Tab1({super.key});
+  final Map<String, dynamic> dict;
+  final Map<String, dynamic> smp2trd;
+  final Interpreter interpreter;
+  final List<String> labels;
+
+  const Tab1({
+    super.key,
+    required this.dict,
+    required this.smp2trd,
+    required this.interpreter,
+    required this.labels,
+  });
 
   @override
   _Tab1State createState() => _Tab1State();
@@ -20,14 +31,17 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   String _selectedHanzi = "";
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-  late Map<String, dynamic> _dict;
-  late Interpreter _interpreter;
-  late List<String> _labels = [];
   final GlobalKey _canvasKey = GlobalKey();
+  late stt.SpeechToText _speech; // Speech-to-text object
+  bool _isListening = false; // Indicates if the app is currently listening
+  String _spokenText = ""; // Stores the recognized text
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize the SpeechToText object
+    _speech = stt.SpeechToText();
 
     // Initialize the animation controller
     _controller = AnimationController(
@@ -40,42 +54,41 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       parent: _controller,
       curve: Curves.easeInOut,
     );
+  }
 
-    loadDict();
-    loadModel();
-    loadLabels();
+  // Start listening to speech
+  void _startListening() async {
+    bool available = await _speech.initialize(
+      onStatus: (status) => print('Speech status: $status'),
+      onError: (error) => print('Speech error: $error'),
+    );
+
+    if (available) {
+      setState(() => _isListening = true);
+      _speech.listen(onResult: (result) {
+        setState(() {
+          _spokenText = result.recognizedWords;
+          // Optionally process the recognized text
+          if (_spokenText.isNotEmpty) {
+            _showHanzi(_spokenText);
+          }
+        });
+      });
+    } else {
+      print("Speech recognition not available");
+    }
+  }
+
+  // Stop listening
+  void _stopListening() {
+    _speech.stop();
+    setState(() => _isListening = false);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> loadDict() async {
-    try {
-      final jsonString = await rootBundle.loadString('assets/dict.json');
-      _dict = json.decode(jsonString);
-    } catch (e) {
-      print("Error loading dictionary: $e");
-    }
-  }
-
-  Future<void> loadModel() async {
-    try {
-      _interpreter = await Interpreter.fromAsset('assets/model.tflite');
-    } catch (e) {
-      print("Error loading model: $e");
-    }
-  }
-
-  Future<void> loadLabels() async {
-    try {
-      final labelsData = await rootBundle.loadString('assets/labels.txt');
-      _labels = labelsData.split('\n'); // Directly assign the labels
-    } catch (e) {
-      print("Error loading labels: $e");
-    }
   }
 
   Future<void> recognizeHanzi() async {
@@ -85,7 +98,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     final output = List.generate(1, (index) => List.filled(3755, 0.0)); // Adjust output size
 
     try {
-      _interpreter.run(input, output); // Run inference
+      widget.interpreter.run(input, output); // Run inference
 
       // Flatten the output tensor (if necessary) and extract scores
       final scores = output[0];
@@ -99,12 +112,12 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
       // Display the top-5 candidates with their labels and scores
       setState(() {
-        _recognizedHanzi = top5.map((entry) => _labels[entry.key]).toList();
+        _recognizedHanzi = top5.map((entry) => widget.labels[entry.key]).toList();
       });
 
       print("Top-5 Results:");
       for (var entry in top5) {
-        print("${_labels[entry.key]}: ${entry.value}");
+        print("${widget.labels[entry.key]}: ${entry.value}");
       }
     } catch (e) {
       print("Error during inference: $e");
@@ -171,7 +184,11 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     setState(() {
       _points.clear();
       _recognizedHanzi = [];
-      _selectedHanzi = hanzi;
+      if (widget.smp2trd.containsKey(hanzi)) {
+        _selectedHanzi = widget.smp2trd[hanzi]!;
+      } else {
+        _selectedHanzi = hanzi;
+      }
     });
 
     _controller.forward(from: 0).then((_) {
@@ -225,25 +242,34 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     ),
                   ],
                 ),
-                ...?_dict[_selectedHanzi]?.map((e) {
+                ...?widget.dict[_selectedHanzi]?.map((e) {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (e["spell"] != null)
+                        Text(
+                          "${e["spell"]} ",
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontFamily: 'YunGothic',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       Text(
                         "${e["def"]} ",
                         style: const TextStyle(
-                          fontSize: 50,
+                          fontSize: 40,
                           fontFamily: 'YunGothic',
-                          color: Color(0xFF308AC6),
+                          color: Color(0xFF0177C4),
                         ),
                       ),
                       Text(
                         "${e["kor"]}",
                         style: const TextStyle(
-                          fontSize: 50,
+                          fontSize: 40,
                           fontFamily: 'YunGothic',
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF308AC6),
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0177C4),
                         ),
                       ),
                     ],
@@ -302,6 +328,11 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         IconButton(
+                          icon: Icon(Icons.mic),
+                          color: _isListening ? Colors.red : Colors.green,
+                          onPressed: _isListening ? _stopListening : _startListening,
+                        ),
+                        IconButton(
                           icon: Icon(Icons.search),
                           onPressed: () => recognizeHanzi(),
                         ),
@@ -309,13 +340,11 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                           icon: Icon(Icons.undo),
                           onPressed: () {
                             setState(() {
-                              // Remove the last stroke
                               if (_points.isNotEmpty) {
                                 int lastStrokeIndex = _points.lastIndexOf(null);
                                 if (lastStrokeIndex != -1) {
                                   _points.removeRange(lastStrokeIndex, _points.length);
                                 } else {
-                                  // If there are no null separators, clear the entire drawing
                                   _points.clear();
                                 }
                               }
@@ -334,6 +363,15 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                         ),
                       ],
                     ),
+                    // Display spoken text (optional)
+                    if (_spokenText.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          "Spoken Text: $_spokenText",
+                          style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: TextField(
