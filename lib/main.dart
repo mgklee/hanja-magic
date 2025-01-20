@@ -13,7 +13,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(scaffoldBackgroundColor: Colors.white),
+      theme: ThemeData(
+        highlightColor: Colors.transparent,
+        scaffoldBackgroundColor: Colors.white,
+        splashColor: Colors.transparent,
+      ),
       home: HomePage(),
     );
   }
@@ -37,12 +41,15 @@ class _HomePageState extends State<HomePage> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("마법천자문"),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80), // Custom height for the AppBar
+        child: const SizedBox(height: 80),
       ),
       body: tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white,
         currentIndex: _currentIndex,
+        elevation: 0,
         onTap: (index) {
           setState(() {
             _currentIndex = index;
@@ -52,14 +59,16 @@ class _HomePageState extends State<HomePage> {
         // selectedIconTheme: IconThemeData(color: Colors.deepOrange),
         items: const [
           BottomNavigationBarItem(
-              icon: Icon(Icons.list),
-              label: "Tab 1"
+            icon: Icon(Icons.draw),
+            label: "",
           ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.list),
-              label: "Tab 2"
+            icon: Icon(Icons.list),
+            label: "",
           ),
         ],
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
       ),
     );
   }
