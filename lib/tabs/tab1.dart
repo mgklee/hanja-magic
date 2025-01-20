@@ -56,7 +56,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     try {
       final jsonString = await rootBundle.loadString('assets/dict.json');
       _dict = json.decode(jsonString);
-      print(_dict);
     } catch (e) {
       print("Error loading dictionary: $e");
     }
