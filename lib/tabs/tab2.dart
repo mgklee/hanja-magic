@@ -122,6 +122,84 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
         .showSnackBar(SnackBar(content: Text('$appName 삭제되었습니다.')));
   }
 
+  void showAppSearchDialog(BuildContext context) async {
+    // 설치된 앱 리스트 가져오기
+    List<String> installedApps = await installedAppNames;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        List<String> filteredApps = List.from(installedApps); // 초기 상태
+
+        TextEditingController searchController = TextEditingController();
+
+        void filterApps(String query, StateSetter setState) {
+          setState(() {
+            filteredApps = installedApps
+                .where((app) => app.toLowerCase().contains(query.toLowerCase()))
+                .toList();
+          });
+        }
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Dialog(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 검색창
+                    TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        labelText: 'Search App',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        filterApps(value, setState);
+                      },
+                    ),
+                    SizedBox(height: 10),
+                    // 필터링된 목록 표시
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filteredApps.length,
+                        itemBuilder: (context, index) {
+                          return ListTile(
+                            title: Text(filteredApps[index]),
+                            onTap: () {
+                              searchController.text = filteredApps[index];
+                              filterApps(filteredApps[index], setState);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    // 추가 버튼
+                    ElevatedButton(
+                      onPressed: () {
+                        final name = searchController.text.trim();
+                        searchController.clear();
+                        Navigator.pop(context);
+                        if (name.isNotEmpty) {
+                          _addApp(name);
+                        }
+                      },
+                      child: Text('Add App'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDeleteDialog(String appName) {
     showDialog(
       context: context,
@@ -188,33 +266,9 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          showDialog(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: Text('앱 추가하기'),
-              content: TextField(
-                controller: nameController,
-                decoration: InputDecoration(hintText: '앱 이름 입력'),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('취소'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final name = nameController.text.trim();
-                    nameController.clear();
-                    Navigator.pop(context);
-                    if (name.isNotEmpty) {
-                      _addApp(name);
-                    }
-                  },
-                  child: Text('추가'),
-                ),
-              ],
-            ),
-          );
+
+          showAppSearchDialog(context);
+
         },
         child: Icon(Icons.add),
       ),
@@ -228,5 +282,85 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     } catch (_) {
       return Icon(Icons.android);
     }
+  }
+}
+
+class AppSearchDialog extends StatefulWidget {
+  final List<String> appList;
+
+  AppSearchDialog({required this.appList});
+
+  @override
+  _AppSearchDialogState createState() => _AppSearchDialogState();
+}
+
+class _AppSearchDialogState extends State<AppSearchDialog> {
+  TextEditingController _searchController = TextEditingController();
+  List<String> _filteredApps = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredApps = widget.appList; // 초기 상태는 전체 앱 표시
+    _searchController.addListener(_filterApps);
+  }
+
+  void _filterApps() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredApps = widget.appList
+          .where((app) => app.toLowerCase().contains(query))
+          .toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search App',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            SizedBox(height: 10),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _filteredApps.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(_filteredApps[index]),
+                    onTap: () {
+                      _searchController.text = _filteredApps[index];
+                    },
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                // 검색창의 텍스트로 앱 추가
+                Navigator.of(context).pop(_searchController.text);
+              },
+              child: Text('Add App'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
