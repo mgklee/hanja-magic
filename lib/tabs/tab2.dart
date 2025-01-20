@@ -22,17 +22,21 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   final List<Map<String, String>> _apps = [];
   final TextEditingController nameController = TextEditingController();
   List<String> installedAppNames = [];
+  List<HanjaEntry> _allHanjaEntries = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchInstalledAppNames().then((_) {
-      // 설치된 앱 이름 목록을 먼저 받아오고,
-      _loadApps().then((_) {
-        // SharedPreferences에서 _apps 로드
-        setState(() {
-          isLoading = false;
+
+    // 1. dict.json 로드
+    _loadHanjaDictionary().then((_) {
+      // 2. 앱 목록 불러오기
+      _fetchInstalledAppNames().then((_) {
+        _loadApps().then((_) {
+          setState(() {
+            isLoading = false;
+          });
         });
       });
     });
@@ -50,6 +54,41 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
         installedAppNames = names.cast<String>();
       });
     } on PlatformException catch (_) {}
+  }
+
+  Future<void> _loadHanjaDictionary() async {
+    // assets/dict.json 파일 로드
+    final String jsonString = await rootBundle.loadString('assets/dict.json');
+    final Map<String, dynamic> rawData = jsonDecode(jsonString);
+
+    // rawData의 key = 한자, value = List<Map<String, String>>
+    // 예: "刻": [{"kor":"각","def":"새길","spell":"새겨져라!"}], ...
+    List<HanjaEntry> tempList = [];
+
+    rawData.forEach((hanja, entries) {
+      // entries: [{"kor":"각","def":"새길","spell":"새겨져라!"}, ... ]
+      if (entries is List) {
+        for (var e in entries) {
+          if (e is Map<String, dynamic>) {
+            final kor = e["kor"] ?? "";
+            final def = e["def"] ?? "";
+            final spell = e["spell"];
+            tempList.add(
+              HanjaEntry(
+                hanja: hanja,
+                kor: kor,
+                def: def,
+                spell: spell,
+              ),
+            );
+          }
+        }
+      }
+    });
+
+    setState(() {
+      _allHanjaEntries = tempList; // 한자 전체 목록 저장
+    });
   }
 
   Future<void> _loadApps() async {
@@ -97,7 +136,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           'spell': spell,
           'meaning': meaning,
           'reading': reading,
-          'data': additivedata,
+          'additivedata': additivedata,
         });
       });
       await _saveApps();
@@ -172,78 +211,169 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
 
         // 두 번째 단계 - 한자 고르기
         void showHanjaDialog(String appName) {
-          TextEditingController hanjaController = TextEditingController();
-          TextEditingController meaningController = TextEditingController();
-          TextEditingController readingController = TextEditingController();
-          TextEditingController spellController = TextEditingController();
+          // 검색창 컨트롤러
+          TextEditingController searchController = TextEditingController();
 
+          // 한자/뜻/음/주문 컨트롤러
+          TextEditingController combinedController = TextEditingController();
+          TextEditingController spellController = TextEditingController();
+          TextEditingController additiveController = TextEditingController();
+
+          // 검색 결과용 임시 리스트
+          List<HanjaEntry> filteredEntries = List.from(_allHanjaEntries);
+
+          // 검색 로직: (def + kor)에서 공백 제거 후, 사용자가 입력한 검색어도 공백 제거 후 contains
+          void filterHanja(String query, StateSetter setState) {
+            final trimmedQuery = query.replaceAll(RegExp(r'\s+'), '');
+            setState(() {
+              filteredEntries = _allHanjaEntries.where((entry) {
+                final combined = (entry.def + entry.kor).replaceAll(RegExp(r'\s+'), '');
+                return combined.contains(trimmedQuery);
+              }).toList();
+            });
+          }
+
+          // 다이얼로그 표시
           showDialog(
             context: context,
             builder: (BuildContext context) {
-              return Dialog(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Add details for $appName',
-                        style: TextStyle(fontSize: 18),
+              return StatefulBuilder(
+                builder: (BuildContext context, StateSetter setState) {
+                  return Dialog(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 상단 검색 창
+                          TextField(
+                            controller: searchController,
+                            decoration: InputDecoration(
+                              labelText: '한자 검색 (뜻+음)',
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              filterHanja(value, setState);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 검색 결과 리스트
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: filteredEntries.length,
+                              itemBuilder: (context, index) {
+                                final entry = filteredEntries[index];
+                                return ListTile(
+                                  title: Text(
+                                    '${entry.hanja} ${entry.def} ${entry.kor}',
+                                  ),
+                                  onTap: () {
+                                    // 한자/뜻/음/주문을 TextField에 세팅
+                                    combinedController.text =
+                                    '${entry.hanja} ${entry.def} ${entry.kor}';
+                                    spellController.text = entry.spell ?? '';
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 선택된 한자/뜻/음 표시하는 TextField
+                          TextField(
+                            controller: combinedController,
+                            decoration: InputDecoration(
+                              labelText: '한자/뜻/음',
+                              border: OutlineInputBorder(),
+                            ),
+                            enabled: false, // 수정 불가
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 주문(spell)만 수정 가능
+                          TextField(
+                            controller: spellController,
+                            decoration: InputDecoration(
+                              labelText: '주문(spell)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 추가 데이터 입력 필드 (조건부 렌더링)
+                          if (appName == "전화" || appName == "삼성 인터넷")
+                            TextField(
+                              controller: additiveController,
+                              decoration: InputDecoration(
+                                labelText: '추가 데이터',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+
+                          // 저장 버튼
+                          ElevatedButton(
+                            onPressed: () {
+                              // 한자/뜻/음 분리 처리
+                              final combinedText = combinedController.text.trim();
+                              final parts = combinedText.split(' ');
+
+                              final selectedHanja = parts.isNotEmpty ? parts[0] : '';
+                              final selectedDef = parts.length > 1 ? parts[1] : '';
+                              final selectedKor = parts.length > 2 ? parts[2] : '';
+                              final selectedSpell = spellController.text.trim();
+                              final selectedAdditive = additiveController.text.trim();
+
+                              // 중복 확인
+                              final isDuplicate = _apps.any((app) => app['hanja'] == selectedHanja);
+
+                              if (isDuplicate) {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: Text('중복 경고'),
+                                      content: Text('이미 등록한 한자입니다.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: Text('확인'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                return;
+                              }
+
+                              Navigator.of(context).pop(); // 다이얼로그 닫기
+
+                              // _addApp 호출(추가 데이터는 ""로)
+                              _addApp(
+                                appName,
+                                selectedHanja,    // hanja
+                                selectedSpell,    // spell
+                                selectedDef,      // meaning
+                                selectedKor,      // reading
+                                selectedAdditive, // additivedata
+                              );
+                            },
+                            child: Text('Save'),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 10),
-                      TextField(
-                        controller: hanjaController,
-                        decoration: InputDecoration(
-                          labelText: 'Enter Hanja',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      TextField(
-                        controller: meaningController,
-                        decoration: InputDecoration(
-                          labelText: 'Enter Meaning',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      TextField(
-                        controller: readingController,
-                        decoration: InputDecoration(
-                          labelText: 'Enter Reading',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      TextField(
-                        controller: spellController,
-                        decoration: InputDecoration(
-                          labelText: 'Enter Spell',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop(); // Close Hanja Dialog
-                          _addApp(
-                            appName,
-                            hanjaController.text,
-                            spellController.text,
-                            meaningController.text,
-                            readingController.text,
-                            "",
-                          );
-                        },
-                        child: Text('Save Details'),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               );
             },
           );
+
         }
+
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
@@ -426,4 +556,16 @@ class CustomListTile extends StatelessWidget {
   }
 }
 
+class HanjaEntry {
+  final String hanja;   // "刻"
+  final String kor;     // "각"
+  final String def;     // "새길"
+  final String? spell;  // "새겨져라!"
 
+  HanjaEntry({
+    required this.hanja,
+    required this.kor,
+    required this.def,
+    this.spell,
+  });
+}
