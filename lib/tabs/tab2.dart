@@ -148,13 +148,13 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     }
   }
 
-  Future<void> _launchApp(String packageName) async {
+  Future<void> _launchApp(String packageName, String? additivedata) async {
     try {
       final success =
-      await platform.invokeMethod('launchApp', {'packageName': packageName});
+      await platform.invokeMethod('launchApp', {'packageName': packageName, 'additivedata': additivedata ?? "",});
       if (!success) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Cannot launch $packageName')));
+            .showSnackBar(SnackBar(content: Text('Cannot launchhh $packageName')));
       }
     } on PlatformException catch (_) {}
   }
@@ -306,7 +306,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                             TextField(
                               controller: additiveController,
                               decoration: InputDecoration(
-                                labelText: '추가 데이터',
+                                labelText: '전화번호 / URL',
                                 border: OutlineInputBorder(),
                               ),
                             ),
@@ -451,7 +451,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                   ListTile(
                     leading: Icon(Icons.android),
                     title: Text(app['name']!),
-                    onTap: () => _launchApp(app['package']!),
+                    onTap: () => _launchApp(app['package']!, app['additivedata']),
                   ),
                 Divider(),
                 for (final app in _apps)
@@ -463,7 +463,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                     icon1: _buildIcon(app['icon'] ?? ''),
                     icon2: Icon(Icons.delete),
                     onTap: (app['package'] ?? '').isNotEmpty
-                        ? () => _launchApp(app['package']!)
+                        ? () => _launchApp(app['package']!, app['additivedata'])
                         : null,
                     onDelete: () => _showDeleteDialog(app['name'] ?? ''),
                   )
@@ -521,19 +521,66 @@ class CustomListTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Stack(
+              children: [
+                Text(
+                  "$hanja ",
+                  style: TextStyle(
+                    fontSize: 50,
+                    fontFamily: 'HanyangHaeseo',
+                    fontWeight: FontWeight.bold,
+                    foreground: Paint()
+                      ..style = PaintingStyle.stroke
+                      ..strokeWidth = 2 // Border thickness
+                      ..color = Color(0xFFDB7890), // Border color
+                  ),
+                ),
+                // Main text
+                Text(
+                  "$hanja ",
+                  style: const TextStyle(
+                    fontSize: 50,
+                    fontFamily: 'HanyangHaeseo',
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFE392A3), // Text color
+                  ),
+                ),
+              ],
+            ),
             // Leading
-            Text(hanja, style: TextStyle(fontSize: 30)),
 
             // Title1, Title2, Title3 in Column
             Expanded(
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(spell, style: TextStyle(fontSize: 24)),
-                  Text(meaning, style: TextStyle(fontSize: 26)),
-                  Text(reading, style: TextStyle(fontSize: 26)),
+                  Text(
+                    "$spell ",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontFamily: 'YunGothic',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "$meaning ",
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'YunGothic',
+                      color: Color(0xFF0177C4),
+                    ),
+                  ),
+                  Text(
+                    "$reading",
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'YunGothic',
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0177C4),
+                    ),
+                  ),
                 ],
               ),
             ),
