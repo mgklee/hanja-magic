@@ -118,10 +118,6 @@ class _HomePageState extends State<HomePage> {
     ];
 
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80), // Custom height for the AppBar
-        child: const SizedBox(height: 80),
-      ),
       body: tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,

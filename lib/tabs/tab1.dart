@@ -36,6 +36,8 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   List<Offset?> _points = [];
   List<String> _recognizedHanja = [];
   String _selectedHanja = "";
+  double _scrollOffset = 0.0;
+  final ScrollController _scrollController = ScrollController();
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   final GlobalKey _canvasKey = GlobalKey();
@@ -43,16 +45,14 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   late stt.SpeechToText _speech; // Speech-to-text object
   bool _isListening = false; // Indicates if the app is currently listening
   String _spokenText = ""; // Stores the recognized text
-  ScrollController _scrollController = ScrollController();
-  double _scrollOffset = 0.0;
   bool _isFromSP = true;
 
   @override
   void initState() {
     super.initState();
     _loadApps();
-    configureTTS();
     _startAutoScroll();
+    configureTTS();
 
     // Initialize the SpeechToText object
     _speech = stt.SpeechToText();
@@ -92,15 +92,34 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     }
   }
 
-  Future<void> _launchApp(String packageName, String? additivedata) async {
+  Future<void> _launchApp(String packageName, String? extraData) async {
     try {
-      final success =
-        await platform.invokeMethod('launchApp', {'packageName': packageName, 'additivedata': additivedata ?? "",});
+      final success = await platform.invokeMethod(
+        'launchApp',
+        {'packageName': packageName, 'extraData': extraData ?? "",}
+      );
       if (!success) {
         ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Cannot launch $packageName')));
       }
     } on PlatformException catch (_) {}
+  }
+
+  void _startAutoScroll() {
+    Timer.periodic(Duration(milliseconds: 50), (Timer timer) {
+      if (_scrollController.hasClients) {
+        final maxScrollExtent = _scrollController.position.maxScrollExtent;
+
+        if (_scrollOffset < maxScrollExtent) {
+          _scrollOffset += 2.0; // Adjust the scroll speed
+          _scrollController.animateTo(
+            _scrollOffset,
+            duration: Duration(milliseconds: 50),
+            curve: Curves.linear,
+          );
+        }
+      }
+    });
   }
 
   void configureTTS() async {
@@ -117,26 +136,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
     // Set pitch
     await _flutterTts.setPitch(1.0); // 0.5 to 2.0
-  }
-
-  void _startAutoScroll() {
-    Timer.periodic(Duration(milliseconds: 50), (Timer timer) {
-      if (_scrollController.hasClients) {
-        final maxScrollExtent = _scrollController.position.maxScrollExtent;
-
-        if (_scrollOffset >= maxScrollExtent) {
-          _scrollOffset = 0.0; // Reset to the beginning
-        } else {
-          _scrollOffset += 2.0; // Adjust the scroll speed
-        }
-
-        _scrollController.animateTo(
-          _scrollOffset,
-          duration: Duration(milliseconds: 50),
-          curve: Curves.linear,
-        );
-      }
-    });
   }
 
   void _findHanjaFromSpeech(String speechText) {
@@ -196,7 +195,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       print("No matching Hanja found for $speechText");
     }
   }
-
 
   // Start listening to speech
   void _startListening() async {
@@ -334,7 +332,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       _isFromSP = isInApps;
     });
 
-
     final dictEntry = widget.dict[_selectedHanja];
     if (dictEntry == null) {
       // dict에 전혀 없는 한자를 입력한 경우
@@ -350,10 +347,11 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       return; // 아래 코드로 내려가지 않도록
     }
 
-
-    _flutterTts.speak('${widget.dict[_selectedHanja]?[0]["spell"] ?? ""} ${widget.dict[_selectedHanja]?[0]["def"] ?? ""} ${widget.dict[_selectedHanja][0]["kor"] ?? ""}');
+    _flutterTts.speak('${widget.dict[_selectedHanja]?[0]["spell"] ?? ""} ${widget.dict[_selectedHanja]?[0]["def"] ?? ""} ${widget.dict[_selectedHanja]?[0]["kor"] ?? ""}');
 
     _animationController.forward(from: 0).then((_) {
+      _scrollOffset = 0;
+
       Future.delayed(
         const Duration(milliseconds: 1000),
         () {
@@ -365,7 +363,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
           defaultHanjaMagic(hanja);
 
           if (matchingApp["hanja"] != "" && _isFromSP) {
-            _launchApp(matchingApp['package']!, matchingApp['additivedata']);
+            _launchApp(matchingApp['package']!, matchingApp['extraData']);
           } else {
             print("No matching app found");
           }
@@ -382,7 +380,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
         await platform.invokeMethod('turnOnFlashlight');
         break;
       case "消":
-
         await platform.invokeMethod('turnOffFlashlight');
         break;
       case "震":
@@ -411,8 +408,8 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     TextEditingController textController = TextEditingController();
     List<String> specialHanjas = ["友", "信", "勇", "敬", "忍", "學", "孝", "希", "情", "心"];
 
-    return SingleChildScrollView(
-      child: Center(
+    return Center(
+      child: SingleChildScrollView(
         child: _selectedHanja.isNotEmpty
           ? ScaleTransition(
             scale: _scaleAnimation,
@@ -460,39 +457,39 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     scrollDirection: Axis.horizontal,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (e["spell"] != null)
+                      children: [
+                        if (e["spell"] != null)
+                          Text(
+                            "${e["spell"]} ",
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontFamily: 'YunGothic',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Text(
-                              "${e["spell"]} ",
+                              "${e["def"]} ",
                               style: const TextStyle(
-                                fontSize: 30,
+                                fontSize: 40,
                                 fontFamily: 'YunGothic',
-                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0177C4),
                               ),
                             ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                "${e["meaning"] ?? e["def"]} ",
-                                style: const TextStyle(
-                                  fontSize: 40,
-                                  fontFamily: 'YunGothic',
-                                  color: Color(0xFF0177C4),
-                                ),
+                            Text(
+                              "${e["kor"]}",
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontFamily: 'YunGothic',
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0177C4),
                               ),
-                              Text(
-                                "${e["reading"] ?? e["kor"]}",
-                                style: const TextStyle(
-                                  fontSize: 40,
-                                  fontFamily: 'YunGothic',
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0177C4),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   );
                 }) ?? [],

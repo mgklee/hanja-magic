@@ -17,12 +17,6 @@ class Tab2 extends StatefulWidget {
 
 class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   static const platform = MethodChannel('com.example.hanja_magic/apps');
-
-  final List<Map<String, String>> fixedApps = [
-    {'name': 'Chrome', 'package': 'com.android.chrome'},
-    {'name': '카카오톡', 'package': 'com.kakao.talk'},
-    {'name': 'Gmail', 'package': 'com.google.android.gm'},
-  ];
   final List<Map<String, String>> _apps = [];
   final TextEditingController nameController = TextEditingController();
   List<String> installedAppNames = [];
@@ -38,9 +32,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
       // 2. 앱 목록 불러오기
       _fetchInstalledAppNames().then((_) {
         _loadApps().then((_) {
-          setState(() {
-            isLoading = false;
-          });
+          setState(() => isLoading = false);
         });
       });
     });
@@ -52,11 +44,8 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
 
   Future<void> _fetchInstalledAppNames() async {
     try {
-      final List<dynamic> names =
-      await platform.invokeMethod('getInstalledAppNames');
-      setState(() {
-        installedAppNames = names.cast<String>();
-      });
+      final List<dynamic> names = await platform.invokeMethod('getInstalledAppNames');
+      setState(() => installedAppNames = names.cast<String>());
     } on PlatformException catch (_) {}
   }
 
@@ -76,9 +65,9 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
             tempList.add(
               HanjaEntry(
                 hanja: hanja,
+                spell: spell,
                 kor: kor,
                 def: def,
-                spell: spell,
               ),
             );
           }
@@ -86,9 +75,8 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
       }
     });
 
-    setState(() {
-      _allHanjaEntries = tempList; // 한자 전체 목록 저장
-    });
+    // 한자 전체 목록 저장
+    setState(() => _allHanjaEntries = tempList);
   }
 
   Future<void> _loadApps() async {
@@ -111,11 +99,18 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     await prefs.setStringList('appsData', data);
   }
 
-  Future<void> _addApp(String appName, String hanja, String spell, String meaning, String reading, String additivedata) async {
+  Future<void> _addApp(
+    String appName,
+    String hanja,
+    String spell,
+    String def,
+    String kor,
+    String extraData
+  ) async {
     if (!installedAppNames.any(
-            (name) => name.toLowerCase() == appName.toLowerCase())) {
+      (name) => name.toLowerCase() == appName.toLowerCase())) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('App not found: $appName')));
+        .showSnackBar(SnackBar(content: Text('App not found: $appName')));
       return;
     }
     try {
@@ -133,65 +128,36 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           'icon': iconBase64,
           'hanja': hanja,
           'spell': spell,
-          'meaning': meaning,
-          'reading': reading,
-          'additivedata': additivedata,
+          'def': def,
+          'kor': kor,
+          'extraData': extraData,
         });
       });
       await _saveApps();
       ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('App "$name" added!')));
+        .showSnackBar(SnackBar(content: Text('$name을(를) 추가했습니다.')));
     } on PlatformException catch (_) {
       ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Failed to add $appName')));
+        .showSnackBar(SnackBar(content: Text('$appName을(를) 추가하는 데 실패했습니다.')));
     }
   }
 
-  Future<void> _launchApp(String packageName, String? additivedata) async {
+  Future<void> _launchApp(String packageName, String? extraData) async {
     try {
-      final success =
-      await platform.invokeMethod('launchApp', {'packageName': packageName, 'additivedata': additivedata ?? "",});
+      final success = await platform.invokeMethod(
+        'launchApp',
+        {'packageName': packageName, 'extraData': extraData ?? "",}
+      );
       if (!success) {
         ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Cannot launchhh $packageName')));
+          .showSnackBar(SnackBar(content: Text('$packageName을(를) 실행하는 데 실패했습니다.')));
       }
     } on PlatformException catch (_) {}
   }
 
-  Future<void> _deleteApp(String appName) async {
-    setState(() {
-      _apps.removeWhere((element) => element['name'] == appName);
-    });
-    await _saveApps();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$appName 삭제되었습니다.')));
-  }
-
-  void _showDeleteDialog(String appName) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('$appName 삭제하겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _deleteApp(appName);
-            },
-            child: Text('확인'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void showAppSearchDialog(BuildContext context) async {
     // 설치된 앱 리스트 가져오기
-    List<String> installedApps = await installedAppNames;
+    List<String> installedApps = installedAppNames;
 
     showDialog(
       context: context,
@@ -203,8 +169,8 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
         void filterApps(String query, StateSetter setState) {
           setState(() {
             filteredApps = installedApps
-                .where((app) => app.toLowerCase().contains(query.toLowerCase()))
-                .toList();
+              .where((app) => app.toLowerCase().contains(query.toLowerCase()))
+              .toList();
           });
         }
 
@@ -294,7 +260,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                           TextField(
                             controller: spellController,
                             decoration: InputDecoration(
-                              labelText: '주문(spell)',
+                              labelText: '주문',
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -323,6 +289,10 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                               final selectedKor = parts.length > 2 ? parts[2] : '';
                               final selectedSpell = spellController.text.trim();
                               final selectedAdditive = additiveController.text.trim();
+                              
+                              if (selectedHanja == "") {
+                                return;
+                              }
 
                               // 중복 확인
                               final isDuplicate = _apps.any((app) => app['hanja'] == selectedHanja);
@@ -355,12 +325,12 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                                 appName,
                                 selectedHanja,    // hanja
                                 selectedSpell,    // spell
-                                selectedDef,      // meaning
-                                selectedKor,      // reading
-                                selectedAdditive, // additivedata
+                                selectedDef,      // def
+                                selectedKor,      // kor
+                                selectedAdditive, // extraData
                               );
                             },
-                            child: Text('Save'),
+                            child: Text('저장'),
                           ),
                         ],
                       ),
@@ -370,7 +340,6 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
               );
             },
           );
-
         }
 
         return StatefulBuilder(
@@ -385,7 +354,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                     TextField(
                       controller: searchController,
                       decoration: InputDecoration(
-                        labelText: 'Search App',
+                        labelText: '검색',
                         border: OutlineInputBorder(),
                       ),
                       onChanged: (value) {
@@ -420,7 +389,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                           showHanjaDialog(name);
                         }
                       },
-                      child: Text('Next'),
+                      child: Text('다음'),
                     ),
                   ],
                 ),
@@ -439,43 +408,66 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     super.build(context); // 추가
     return Scaffold(
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Expanded(
-            child: ListView(
-              children: [
-                for (final app in fixedApps)
-                  ListTile(
-                    leading: Icon(Icons.android),
-                    title: Text(app['name']!),
-                    onTap: () => _launchApp(app['package']!, app['additivedata']),
-                  ),
-                Divider(),
-                for (final app in _apps)
-                  CustomListTile(
-                    hanja: app['hanja'] ?? '',
-                    spell: app['spell'] ?? '',
-                    meaning: app['meaning'] ?? '',
-                    reading: app['reading'] ?? '',
-                    icon1: _buildIcon(app['icon'] ?? ''),
-                    icon2: Icon(Icons.delete),
-                    onTap: (app['package'] ?? '').isNotEmpty
-                        ? () => _launchApp(app['package']!, app['additivedata'])
-                        : null,
-                    onDelete: () => _showDeleteDialog(app['name'] ?? ''),
-                  )
-              ],
+        ? Center(child: CircularProgressIndicator())
+        : Column(
+          children: [
+            Expanded(
+              child: ListView(
+                children: [
+                  for (int i = 0; i < _apps.length; i++)
+                    Dismissible(
+                      key: ValueKey(_apps[i]['hanja']),
+                      direction: DismissDirection.startToEnd,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.only(left: 20.0),
+                        child: const Icon(
+                          Icons.delete,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onDismissed: (direction) async {
+                        final removedApp = _apps[i];
+                        setState(() => _apps.removeAt(i));
+                        await _saveApps();
+
+                        // Snackbar with "Undo"
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${removedApp['name']}을(를) 제거했습니다.'),
+                            action: SnackBarAction(
+                              label: '실행 취소',
+                              onPressed: () {
+                                setState(() => _apps.insert(i, removedApp));
+                                _saveApps();
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      child: CustomListTile(
+                        hanja: _apps[i]['hanja'] ?? '',
+                        spell: _apps[i]['spell'] ?? '',
+                        def: _apps[i]['def'] ?? '',
+                        kor: _apps[i]['kor'] ?? '',
+                        icon: _buildIcon(_apps[i]['icon'] ?? ''),
+                        onTap: (_apps[i]['package'] ?? '').isNotEmpty
+                          ? () => _launchApp(
+                            _apps[i]['package']!,
+                            _apps[i]['extraData'],
+                          )
+                          : null,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-
-          showAppSearchDialog(context);
-
-        },
+        onPressed: () => showAppSearchDialog(context),
         child: Icon(Icons.add),
       ),
     );
@@ -494,108 +486,95 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
 class CustomListTile extends StatelessWidget {
   final String hanja;
   final String spell;
-  final String meaning;
-  final String reading;
-  final Widget icon1;
-  final Widget icon2;
+  final String def;
+  final String kor;
+  final Widget icon;
   final VoidCallback? onTap;
-  final VoidCallback? onDelete;
 
-  CustomListTile({
+  const CustomListTile({
+    super.key,
     required this.hanja,
     required this.spell,
-    required this.meaning,
-    required this.reading,
-    required this.icon1,
-    required this.icon2,
+    required this.def,
+    required this.kor,
+    required this.icon,
     this.onTap,
-    this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              Text(
+                "$hanja ",
+                style: TextStyle(
+                  fontSize: 50,
+                  fontFamily: 'HanyangHaeseo',
+                  fontWeight: FontWeight.bold,
+                  foreground: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 2 // Border thickness
+                    ..color = Color(0xFFDB7890), // Border color
+                ),
+              ),
+              // Main text
+              Text(
+                "$hanja ",
+                style: const TextStyle(
+                  fontSize: 50,
+                  fontFamily: 'HanyangHaeseo',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE392A3), // Text color
+                ),
+              ),
+            ],
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "$hanja ",
-                  style: TextStyle(
-                    fontSize: 50,
-                    fontFamily: 'HanyangHaeseo',
-                    fontWeight: FontWeight.bold,
-                    foreground: Paint()
-                      ..style = PaintingStyle.stroke
-                      ..strokeWidth = 2 // Border thickness
-                      ..color = Color(0xFFDB7890), // Border color
-                  ),
-                ),
-                // Main text
-                Text(
-                  "$hanja ",
-                  style: const TextStyle(
-                    fontSize: 50,
-                    fontFamily: 'HanyangHaeseo',
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFE392A3), // Text color
-                  ),
-                ),
-              ],
-            ),
-            // Leading
-
-            // Title1, Title2, Title3 in Column
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+                if (spell != "")
                   Text(
-                    "$spell ",
+                    spell,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 15,
                       fontFamily: 'YunGothic',
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
-                    "$meaning ",
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'YunGothic',
-                      color: Color(0xFF0177C4),
+                Row(
+                  children: [
+                    Text(
+                      "$def ",
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontFamily: 'YunGothic',
+                        color: Color(0xFF0177C4),
+                      ),
                     ),
-                  ),
-                  Text(
-                    "$reading",
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'YunGothic',
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0177C4),
+                    Text(
+                      kor,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontFamily: 'YunGothic',
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0177C4),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Trailing Icons
-            Row(
-              children: [
-                icon1,
-                SizedBox(width: 8.0),
-                IconButton(
-                  icon: icon2,
-                  onPressed: onDelete,
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          GestureDetector(
+            onTap: onTap,
+            child: icon,
+          ),
+        ],
       ),
     );
   }
@@ -603,14 +582,14 @@ class CustomListTile extends StatelessWidget {
 
 class HanjaEntry {
   final String hanja;   // "刻"
-  final String kor;     // "각"
-  final String def;     // "새길"
   final String? spell;  // "새겨져라!"
+  final String def;     // "새길"
+  final String kor;     // "각"
 
   HanjaEntry({
     required this.hanja,
-    required this.kor,
-    required this.def,
     this.spell,
+    required this.def,
+    required this.kor,
   });
 }
