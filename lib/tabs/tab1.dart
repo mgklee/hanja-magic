@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'dart:convert';
 import 'package:image/image.dart' as img;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,8 @@ class Tab1 extends StatefulWidget {
 }
 
 class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
+  static const platform = MethodChannel('com.example.hanja_magic/apps');
+  final List<Map<String, String>> _apps = [];
   List<Offset?> _points = [];
   List<String> _recognizedHanja = [];
   String _selectedHanja = "";
@@ -46,6 +49,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _loadApps();
     configureTTS();
     _startAutoScroll();
 
@@ -71,6 +75,47 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     _animationController.dispose();
     _flutterTts.stop();
     super.dispose();
+  }
+
+  Future<void> _loadApps() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList('appsData');
+
+    if (data != null) {
+      final list = data.map((jsonStr) {
+        final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+        return decoded.map((k, v) => MapEntry(k, v.toString()));
+      }).toList();
+      _apps.clear();
+      _apps.addAll(list);
+    }
+  }
+
+  Future<void> _launchApp(String packageName, String? additivedata) async {
+    try {
+      final success =
+        await platform.invokeMethod('launchApp', {'packageName': packageName, 'additivedata': additivedata ?? "",});
+      if (!success) {
+        ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Cannot launch $packageName')));
+      }
+    } on PlatformException catch (_) {}
+  }
+
+  void configureTTS() async {
+    // Set language
+    await _flutterTts.setLanguage("ko-KR");
+
+    await _flutterTts.setVoice({
+      "name": "ko-KR-SMTg01",
+      "locale": "kor-x-lvariant-g01",
+    });
+
+    // Set speech rate
+    await _flutterTts.setSpeechRate(0.5); // 0.0 to 1.0
+
+    // Set pitch
+    await _flutterTts.setPitch(1.0); // 0.5 to 2.0
   }
 
   void _startAutoScroll() {
@@ -168,22 +213,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   void _stopListening() {
     _speech.stop();
     setState(() => _isListening = false);
-  }
-
-  void configureTTS() async {
-    // Set language
-    await _flutterTts.setLanguage("ko-KR");
-
-    await _flutterTts.setVoice({
-      "name": "ko-KR-SMTg01",
-      "locale": "kor-x-lvariant-g01",
-    });
-
-    // Set speech rate
-    await _flutterTts.setSpeechRate(0.5); // 0.0 to 1.0
-
-    // Set pitch
-    await _flutterTts.setPitch(1.0); // 0.5 to 2.0
   }
 
   Future<void> recognizeHanja() async {
@@ -289,12 +318,23 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     _flutterTts.speak('${widget.dict[_selectedHanja][0]["spell"] ?? ""} ${widget.dict[_selectedHanja][0]["def"]} ${widget.dict[_selectedHanja][0]["kor"]}');
 
     _animationController.forward(from: 0).then((_) {
-      Future.delayed(const Duration(seconds: 2), () {
-        _animationController.reverse().then((_) {
-          // Clear _selectedHanja after the reverse animation finishes
+      Future.delayed(
+        const Duration(milliseconds: 1500),
+        () {
+          Map<String, String>? matchingApp = _apps.firstWhere(
+            (app) => app["hanja"] == _selectedHanja, // Condition to match
+            orElse: () => {"hanja": ""}, // What to return if no match is found
+          );
+
+          if (matchingApp["hanja"] != "") {
+            _launchApp(matchingApp['package']!, matchingApp['additivedata']);
+          } else {
+            print("No matching app found");
+          }
+
           setState(() => _selectedHanja = "");
-        });
-      });
+        }
+      );
     });
   }
 
