@@ -5,7 +5,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 class Tab2 extends StatefulWidget {
-  const Tab2({Key? key}) : super(key: key);
+  final Map<String, dynamic> dict;
+
+  const Tab2({
+    super.key,
+    required this.dict,
+  });
 
   @override
   _Tab2State createState() => _Tab2State();
@@ -57,15 +62,11 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   }
 
   Future<void> _loadHanjaDictionary() async {
-    // assets/dict.json 파일 로드
-    final String jsonString = await rootBundle.loadString('assets/dict.json');
-    final Map<String, dynamic> rawData = jsonDecode(jsonString);
-
     // rawData의 key = 한자, value = List<Map<String, String>>
     // 예: "刻": [{"kor":"각","def":"새길","spell":"새겨져라!"}], ...
     List<HanjaEntry> tempList = [];
 
-    rawData.forEach((hanja, entries) {
+    widget.dict.forEach((hanja, entries) {
       // entries: [{"kor":"각","def":"새길","spell":"새겨져라!"}, ... ]
       if (entries is List) {
         for (var e in entries) {
@@ -94,7 +95,6 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   Future<void> _loadApps() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getStringList('appsData');
-
 
     if (data != null) {
       final list = data.map((jsonStr) {
@@ -373,7 +373,6 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
           );
 
         }
-
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {

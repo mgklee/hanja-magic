@@ -1,11 +1,15 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:async';
 import 'package:image/image.dart' as img;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Tab1 extends StatefulWidget {
   final Map<String, dynamic> dict;
@@ -27,55 +31,92 @@ class Tab1 extends StatefulWidget {
 
 class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   List<Offset?> _points = [];
-  List<String> _recognizedHanzi = [];
-  String _selectedHanzi = "";
-  late AnimationController _controller;
+  List<String> _recognizedHanja = [];
+  String _selectedHanja = "";
+  late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   final GlobalKey _canvasKey = GlobalKey();
+  final FlutterTts _flutterTts = FlutterTts();
   late stt.SpeechToText _speech; // Speech-to-text object
   bool _isListening = false; // Indicates if the app is currently listening
   String _spokenText = ""; // Stores the recognized text
+  ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0.0;
 
   @override
   void initState() {
     super.initState();
+    configureTTS();
+    _startAutoScroll();
 
     // Initialize the SpeechToText object
     _speech = stt.SpeechToText();
 
     // Initialize the animation controller
-    _controller = AnimationController(
+    _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
 
     // Define the scale animation
     _scaleAnimation = CurvedAnimation(
-      parent: _controller,
+      parent: _animationController,
       curve: Curves.easeInOut,
     );
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _animationController.dispose();
+    _flutterTts.stop();
+    super.dispose();
+  }
+
+  void _startAutoScroll() {
+    Timer.periodic(Duration(milliseconds: 50), (Timer timer) {
+      if (_scrollController.hasClients) {
+        final maxScrollExtent = _scrollController.position.maxScrollExtent;
+
+        if (_scrollOffset >= maxScrollExtent) {
+          _scrollOffset = 0.0; // Reset to the beginning
+        } else {
+          _scrollOffset += 2.0; // Adjust the scroll speed
+        }
+
+        _scrollController.animateTo(
+          _scrollOffset,
+          duration: Duration(milliseconds: 50),
+          curve: Curves.linear,
+        );
+      }
+    });
+  }
+
   // Start listening to speech
   void _startListening() async {
-    bool available = await _speech.initialize(
-      onStatus: (status) => print('Speech status: $status'),
-      onError: (error) => print('Speech error: $error'),
-    );
+    // Check and request microphone permission
+    if (await Permission.microphone.request().isGranted) {
+      bool available = await _speech.initialize(
+        onStatus: (status) => print('Speech status: $status'),
+        onError: (error) => print('Speech error: $error'),
+      );
 
-    if (available) {
-      setState(() => _isListening = true);
-      _speech.listen(onResult: (result) {
-        setState(() {
-          _spokenText = result.recognizedWords;
-          // Optionally process the recognized text
-          if (_spokenText.isNotEmpty) {
-            _showHanzi(_spokenText);
-          }
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(onResult: (result) {
+          setState(() {
+            _spokenText = result.recognizedWords;
+            if (_spokenText.isNotEmpty) {
+              _showHanja(_spokenText);
+            }
+          });
         });
-      });
+      } else {
+        print("Speech recognition not available");
+      }
     } else {
-      print("Speech recognition not available");
+      print("Microphone permission denied");
     }
   }
 
@@ -85,13 +126,23 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     setState(() => _isListening = false);
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void configureTTS() async {
+    // Set language
+    await _flutterTts.setLanguage("ko-KR");
+
+    await _flutterTts.setVoice({
+      "name": "ko-KR-SMTg01",
+      "locale": "kor-x-lvariant-g01",
+    });
+
+    // Set speech rate
+    await _flutterTts.setSpeechRate(0.5); // 0.0 to 1.0
+
+    // Set pitch
+    await _flutterTts.setPitch(1.0); // 0.5 to 2.0
   }
 
-  Future<void> recognizeHanzi() async {
+  Future<void> recognizeHanja() async {
     final imagePath = await saveDrawingToImage();
     final inputImage = File(imagePath).readAsBytesSync();
     final input = preprocessImage(inputImage); // Prepare image input
@@ -112,7 +163,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
       // Display the top-5 candidates with their labels and scores
       setState(() {
-        _recognizedHanzi = top5.map((entry) => widget.labels[entry.key]).toList();
+        _recognizedHanja = top5.map((entry) => widget.labels[entry.key]).toList();
       });
 
       print("Top-5 Results:");
@@ -180,24 +231,24 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     return filePath;
   }
 
-  void _showHanzi(String hanzi) {
+  void _showHanja(String hanja) {
     setState(() {
       _points.clear();
-      _recognizedHanzi = [];
-      if (widget.smp2trd.containsKey(hanzi)) {
-        _selectedHanzi = widget.smp2trd[hanzi]!;
+      _recognizedHanja = [];
+      if (widget.smp2trd.containsKey(hanja)) {
+        _selectedHanja = widget.smp2trd[hanja]!;
       } else {
-        _selectedHanzi = hanzi;
+        _selectedHanja = hanja;
       }
     });
 
-    _controller.forward(from: 0).then((_) {
+    _flutterTts.speak('${widget.dict[_selectedHanja][0]["spell"] ?? ""} ${widget.dict[_selectedHanja][0]["def"]} ${widget.dict[_selectedHanja][0]["kor"]}');
+
+    _animationController.forward(from: 0).then((_) {
       Future.delayed(const Duration(seconds: 2), () {
-        _controller.reverse().then((_) {
-          // Clear _selectedHanzi after the reverse animation finishes
-          setState(() {
-            _selectedHanzi = "";
-          });
+        _animationController.reverse().then((_) {
+          // Clear _selectedHanja after the reverse animation finishes
+          setState(() => _selectedHanja = "");
         });
       });
     });
@@ -206,10 +257,11 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     TextEditingController textController = TextEditingController();
+    List<String> specialHanjas = ["友", "信", "勇", "敬", "忍", "學", "孝", "希", "情", "心"];
 
     return SingleChildScrollView(
       child: Center(
-        child: _selectedHanzi.isNotEmpty
+        child: _selectedHanja.isNotEmpty
           ? ScaleTransition(
             scale: _scaleAnimation,
             child: Column(
@@ -219,7 +271,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                   children: [
                     // Text with border effect
                     Text(
-                      _selectedHanzi,
+                      _selectedHanja,
                       style: TextStyle(
                         fontSize: 300,
                         fontFamily: 'HanyangHaeseo',
@@ -227,52 +279,60 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                         foreground: Paint()
                           ..style = PaintingStyle.stroke
                           ..strokeWidth = 4 // Border thickness
-                          ..color = Color(0xFFDB7890), // Border color
+                          ..color = specialHanjas.contains(_selectedHanja)
+                            ? Color(0xFF80B23D)
+                            : Color(0xFFDB7890), // Border color
                       ),
                     ),
                     // Main text
                     Text(
-                      _selectedHanzi,
-                      style: const TextStyle(
+                      _selectedHanja,
+                      style: TextStyle(
                         fontSize: 300,
                         fontFamily: 'HanyangHaeseo',
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFE392A3), // Text color
+                        color: specialHanjas.contains(_selectedHanja)
+                          ? Color(0xFFA6CB5B)
+                          : Color(0xFFE392A3), // Text color
                       ),
                     ),
                   ],
                 ),
-                ...?widget.dict[_selectedHanzi]?.map((e) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (e["spell"] != null)
+                ...?widget.dict[_selectedHanja]?.map((e) {
+                  return SingleChildScrollView(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (e["spell"] != null)
+                          Text(
+                            "${e["spell"]} ",
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontFamily: 'YunGothic',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         Text(
-                          "${e["spell"]} ",
+                          "${e["def"]} ",
                           style: const TextStyle(
-                            fontSize: 30,
+                            fontSize: 40,
                             fontFamily: 'YunGothic',
-                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0177C4),
                           ),
                         ),
-                      Text(
-                        "${e["def"]} ",
-                        style: const TextStyle(
-                          fontSize: 40,
-                          fontFamily: 'YunGothic',
-                          color: Color(0xFF0177C4),
+                        Text(
+                          "${e["kor"]}",
+                          style: const TextStyle(
+                            fontSize: 40,
+                            fontFamily: 'YunGothic',
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0177C4),
+                          ),
                         ),
-                      ),
-                      Text(
-                        "${e["kor"]}",
-                        style: const TextStyle(
-                          fontSize: 40,
-                          fontFamily: 'YunGothic',
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0177C4),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 }) ?? [],
               ],
@@ -300,15 +360,11 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                               localPosition.dy >= 7 &&
                               localPosition.dx <= canvasSize.width - 15 &&
                               localPosition.dy <= canvasSize.height - 15) {
-                            setState(() {
-                              _points.add(localPosition);
-                            });
+                            setState(() => _points.add(localPosition));
                           }
                         },
                         onPanEnd: (_) {
-                          setState(() {
-                            _points.add(null); // Separate strokes
-                          });
+                          setState(() => _points.add(null)); // Separate strokes
                         },
                         child: Container(
                           key: _canvasKey, // Assign the key to the canvas container
@@ -334,16 +390,16 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                         ),
                         IconButton(
                           icon: Icon(Icons.search),
-                          onPressed: () => recognizeHanzi(),
+                          onPressed: () => recognizeHanja(),
                         ),
                         IconButton(
                           icon: Icon(Icons.undo),
                           onPressed: () {
                             setState(() {
                               if (_points.isNotEmpty) {
-                                int lastStrokeIndex = _points.lastIndexOf(null);
+                                int lastStrokeIndex = _points.sublist(0, _points.length - 1).lastIndexOf(null);
                                 if (lastStrokeIndex != -1) {
-                                  _points.removeRange(lastStrokeIndex, _points.length);
+                                  _points.removeRange(lastStrokeIndex, _points.length - 1);
                                 } else {
                                   _points.clear();
                                 }
@@ -356,8 +412,8 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                           onPressed: () {
                             setState(() {
                               _points.clear();
-                              _recognizedHanzi = [];
-                              _selectedHanzi = "";
+                              _recognizedHanja = [];
+                              _selectedHanja = "";
                             });
                           },
                         ),
@@ -388,7 +444,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                         maxLength: 1, // Limits input to one character
                         onSubmitted: (value) {
                           if (value.isNotEmpty) {
-                            _showHanzi(value); // Show the typed Hanzi
+                            _showHanja(value); // Show the typed Hanja
                             textController.clear(); // Clear the text field after submission
                           }
                         },
@@ -397,16 +453,16 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                   ],
                 ),
               ),
-              if (_recognizedHanzi.isNotEmpty)
+              if (_recognizedHanja.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Wrap(
                     spacing: 8.0,
-                    children: _recognizedHanzi.map((hanzi) {
+                    children: _recognizedHanja.map((hanja) {
                       return TextButton(
-                        onPressed: () => _showHanzi(hanzi),
+                        onPressed: () => _showHanja(hanja),
                         child: Text(
-                          hanzi,
+                          hanja,
                           style: TextStyle(fontSize: 18)
                         ),
                       );

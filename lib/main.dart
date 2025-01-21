@@ -114,7 +114,7 @@ class _HomePageState extends State<HomePage> {
         interpreter: widget.interpreter,
         labels: widget.labels,
       ),
-      Tab2(),
+      Tab2(dict: widget.dict),
     ];
 
     return Scaffold(
