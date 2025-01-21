@@ -1,8 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'dart:typed_data';
 
 class Tab2 extends StatefulWidget {
   final Map<String, dynamic> dict;
@@ -141,10 +140,10 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
       });
       await _saveApps();
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('App "$name" added!')));
+        .showSnackBar(SnackBar(content: Text('App "$name" added!')));
     } on PlatformException catch (_) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to add $appName')));
+        .showSnackBar(SnackBar(content: Text('Failed to add $appName')));
     }
   }
 
@@ -154,7 +153,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
       await platform.invokeMethod('launchApp', {'packageName': packageName, 'additivedata': additivedata ?? "",});
       if (!success) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Cannot launchhh $packageName')));
+          .showSnackBar(SnackBar(content: Text('Cannot launchhh $packageName')));
       }
     } on PlatformException catch (_) {}
   }
