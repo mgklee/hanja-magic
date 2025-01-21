@@ -45,6 +45,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   String _spokenText = ""; // Stores the recognized text
   ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0.0;
+  bool _isFromSP = true;
 
   @override
   void initState() {
@@ -158,33 +159,34 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
       // normalize combined text
       String combinedText = normalize("$appSpell$appDef$appKor");
-      print("Checking App Hanja: ${app['hanja']}, Combined Text: $combinedText");
 
       if (combinedText == normalizedInput) {
         matchedHanja = app["hanja"];
+        _isFromSP = true;
         break;
       }
     }
 
     // search hanja from dict.json
-    widget.dict.forEach((hanja, details) {
-      for (var detail in details) {
-        // spell + def + kor
-        String dbSpell = detail["spell"] ?? "";
-        String dbDef = detail["def"] ?? "";
-        String dbKor = detail["kor"] ?? "";
+    if (matchedHanja == null) {
+      widget.dict.forEach((hanja, details) {
+        for (var detail in details) {
+          // spell + def + kor
+          String dbSpell = detail["spell"] ?? "";
+          String dbDef = detail["def"] ?? "";
+          String dbKor = detail["kor"] ?? "";
 
-        // normalize combined text
-        String combinedText = normalize("$dbSpell$dbDef$dbKor");
-        print("Checking Hanja: $hanja, Combined Text: $combinedText");
+          // normalize combined text
+          String combinedText = normalize("$dbSpell$dbDef$dbKor");
 
-        if (combinedText == normalizedInput) {
-          matchedHanja = hanja;
-          break;
+          if (combinedText == normalizedInput) {
+            matchedHanja = hanja;
+            _isFromSP = false;
+            break;
+          }
         }
-      }
-      if (matchedHanja != null) return; // stop when find matching hanja
-    });
+      });
+    }
 
     // get result
     if (matchedHanja != null) {
@@ -192,9 +194,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       _showHanja(matchedHanja!);
     } else {
       print("No matching Hanja found for \"$speechText\"");
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("No matching Hanja found for \"$speechText\""))
-      );
     }
   }
 
@@ -344,7 +343,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
             orElse: () => {"hanja": ""}, // What to return if no match is found
           );
 
-          if (matchingApp["hanja"] != "") {
+          if (matchingApp["hanja"] != "" && _isFromSP) {
             _launchApp(matchingApp['package']!, matchingApp['additivedata']);
           } else {
             print("No matching app found");
@@ -400,9 +399,10 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     ),
                   ],
                 ),
-                ...(_apps.where((e) => e['hanja'] == _selectedHanja).isNotEmpty
-                    ? _apps.where((e) => e['hanja'] == _selectedHanja)
-                    : widget.dict[_selectedHanja] ?? []
+                ...?(
+                    _isFromSP
+                        ? _apps.where((e) => e['hanja'] == _selectedHanja)
+                        : widget.dict[_selectedHanja] ?? []
                 ).map((e) {
                   return SingleChildScrollView(
                     controller: _scrollController,
