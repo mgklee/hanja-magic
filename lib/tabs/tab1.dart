@@ -93,6 +93,49 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     });
   }
 
+  void _findHanjaFromSpeech(String speechText) {
+    // normalize spoken text
+    String normalize(String text) {
+      return text.replaceAll(RegExp(r'[^\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F\w]'), '').toLowerCase();
+    }
+
+    String normalizedInput = normalize(speechText);
+    print("Normalized input: $normalizedInput");
+
+    String? matchedHanja;
+
+    widget.dict.forEach((hanja, details) {
+      for (var detail in details) {
+        // spell + def + kor
+        String dbSpell = detail["spell"] ?? "";
+        String dbDef = detail["def"] ?? "";
+        String dbKor = detail["kor"] ?? "";
+
+        // normalize combined text
+        String combinedText = normalize("$dbSpell$dbDef$dbKor");
+        print("Checking Hanja: $hanja, Combined Text: $combinedText");
+
+        if (combinedText == normalizedInput) {
+          matchedHanja = hanja;
+          break;
+        }
+      }
+      if (matchedHanja != null) return; // stop when find matching hanja
+    });
+
+    // get result
+    if (matchedHanja != null) {
+      print("Matched Hanja: $matchedHanja");
+      _showHanja(matchedHanja!);
+    } else {
+      print("No matching Hanja found for \"$speechText\"");
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("No matching Hanja found for \"$speechText\""))
+      );
+    }
+  }
+
+
   // Start listening to speech
   void _startListening() async {
     // Check and request microphone permission
@@ -107,8 +150,9 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
         _speech.listen(onResult: (result) {
           setState(() {
             _spokenText = result.recognizedWords;
+            print("spokenText is $_spokenText");
             if (_spokenText.isNotEmpty) {
-              _showHanja(_spokenText);
+              _findHanjaFromSpeech(_spokenText);
             }
           });
         });
