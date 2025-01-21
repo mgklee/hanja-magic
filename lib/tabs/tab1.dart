@@ -193,7 +193,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       print("Matched Hanja: $matchedHanja");
       _showHanja(matchedHanja!);
     } else {
-      print("No matching Hanja found for \"$speechText\"");
+      print("No matching Hanja found for $speechText");
     }
   }
 
@@ -322,6 +322,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   }
 
   void _showHanja(String hanja) {
+    bool isInApps = _apps.any((app) => app["hanja"] == hanja);
     setState(() {
       _points.clear();
       _recognizedHanja = [];
@@ -330,18 +331,38 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       } else {
         _selectedHanja = hanja;
       }
+      _isFromSP = isInApps;
     });
 
-    _flutterTts.speak('${widget.dict[_selectedHanja][0]["spell"] ?? ""} ${widget.dict[_selectedHanja][0]["def"]} ${widget.dict[_selectedHanja][0]["kor"]}');
+
+    final dictEntry = widget.dict[_selectedHanja];
+    if (dictEntry == null) {
+      // dict에 전혀 없는 한자를 입력한 경우
+      // 1) 음성으로 안내하고(또는 아무것도 안 하고),
+      // 2) 혹시 애니메이션이라도 보여주고 싶다면 (한자만 표시)
+      _flutterTts.speak("등록되지 않은 한자입니다.");
+      _animationController.forward(from: 0).then((_) {
+        Future.delayed(
+          const Duration(milliseconds: 1000),
+              () => setState(() => _selectedHanja = ""),
+        );
+      });
+      return; // 아래 코드로 내려가지 않도록
+    }
+
+
+    _flutterTts.speak('${widget.dict[_selectedHanja]?[0]["spell"] ?? ""} ${widget.dict[_selectedHanja]?[0]["def"] ?? ""} ${widget.dict[_selectedHanja][0]["kor"] ?? ""}');
 
     _animationController.forward(from: 0).then((_) {
       Future.delayed(
-        const Duration(milliseconds: 1500),
+        const Duration(milliseconds: 1000),
         () {
           Map<String, String>? matchingApp = _apps.firstWhere(
             (app) => app["hanja"] == _selectedHanja, // Condition to match
             orElse: () => {"hanja": ""}, // What to return if no match is found
           );
+
+          defaultHanjaMagic(hanja);
 
           if (matchingApp["hanja"] != "" && _isFromSP) {
             _launchApp(matchingApp['package']!, matchingApp['additivedata']);
@@ -353,6 +374,36 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
         }
       );
     });
+  }
+
+  Future<void> defaultHanjaMagic(String hanja) async {
+    switch (hanja) {
+      case "光":
+        await platform.invokeMethod('turnOnFlashlight');
+        break;
+      case "消":
+
+        await platform.invokeMethod('turnOffFlashlight');
+        break;
+      case "震":
+        await platform.invokeMethod('setVibrationMode');
+        break;
+      case "音":;
+        await platform.invokeMethod('setSoundMode');
+        break;
+      case "無":
+        await platform.invokeMethod('setSilentMode');
+        break;
+      case "暗":
+        await platform.invokeMethod('enableDarkMode');
+        break;
+      case "明":
+        await platform.invokeMethod('enableLightMode');
+        break;
+      case "出":
+        await platform.invokeMethod('getOutApp');
+        break;
+    }
   }
 
   @override
@@ -407,36 +458,41 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                   return SingleChildScrollView(
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
-                    child: Row(
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (e["spell"] != null)
-                          Text(
-                            "${e["spell"]} ",
-                            style: const TextStyle(
-                              fontSize: 30,
-                              fontFamily: 'YunGothic',
-                              fontWeight: FontWeight.bold,
+                        children: [
+                          if (e["spell"] != null)
+                            Text(
+                              "${e["spell"]} ",
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontFamily: 'YunGothic',
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "${e["meaning"] ?? e["def"]} ",
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontFamily: 'YunGothic',
+                                  color: Color(0xFF0177C4),
+                                ),
+                              ),
+                              Text(
+                                "${e["reading"] ?? e["kor"]}",
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontFamily: 'YunGothic',
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0177C4),
+                                ),
+                              ),
+                            ],
                           ),
-                        Text(
-                          "${e["meaning"] ?? e["def"]} ",
-                          style: const TextStyle(
-                            fontSize: 40,
-                            fontFamily: 'YunGothic',
-                            color: Color(0xFF0177C4),
-                          ),
-                        ),
-                        Text(
-                          "${e["reading"] ?? e["kor"]}",
-                          style: const TextStyle(
-                            fontSize: 40,
-                            fontFamily: 'YunGothic',
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0177C4),
-                          ),
-                        ),
-                      ],
+                        ],
                     ),
                   );
                 }) ?? [],

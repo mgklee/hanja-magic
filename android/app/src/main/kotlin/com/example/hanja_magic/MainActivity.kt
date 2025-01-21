@@ -12,9 +12,19 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
 import android.content.Intent
 import android.net.Uri
+import android.content.Context
+import android.media.AudioManager
+import android.hardware.camera2.CameraManager
+import android.app.NotificationManager
+import android.provider.Settings
+import android.app.UiModeManager
+import android.os.Build
+import android.content.ContentResolver
+
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.hanja_magic/apps"
+    private var isFlashlightOn = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,6 +33,10 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
             when (call.method) {
                 "getInstalledAppNames" -> {
                     val names = getInstalledAppNames()
@@ -50,6 +64,65 @@ class MainActivity : FlutterActivity() {
                     } else {
                         result.error("INVALID_PACKAGE", "Package name is null or invalid.", null)
                     }
+                }
+                "turnOnFlashlight" -> {
+                    try {
+                        val cameraId = cameraManager.cameraIdList[0] // 기본 카메라
+                        cameraManager.setTorchMode(cameraId, true)
+                        isFlashlightOn = true
+                        result.success("Flashlight turned on")
+                    } catch (e: Exception) {
+                        result.error("FLASHLIGHT_ERROR", "Failed to turn on flashlight", e.message)
+                    }
+                }
+                "turnOffFlashlight" -> {
+                    try {
+                        val cameraId = cameraManager.cameraIdList[0]
+                        cameraManager.setTorchMode(cameraId, false)
+                        isFlashlightOn = false
+                        result.success("Flashlight turned off")
+                    } catch (e: Exception) {
+                        result.error("FLASHLIGHT_ERROR", "Failed to turn off flashlight", e.message)
+                    }
+                }
+                "setVibrationMode" -> {
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                    result.success("Vibration mode activated")
+                }
+                "setSoundMode" -> {
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
+                    result.success("Sound mode activated")
+                }
+                "setSilentMode" -> {
+                    if (notificationManager.isNotificationPolicyAccessGranted) {
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                        result.success("Silent mode activated")
+                    } else {
+                        requestDoNotDisturbPermission()
+                        result.error("PERMISSION_DENIED", "Do Not Disturb permission is required", null)
+                    }
+                }
+                "enableDarkMode" -> {
+                    if (checkWriteSettingsPermission()) {
+                        adjustScreenBrightness(-30) // 밝기 30 감소
+                        result.success("Brightness decreased for Dark Mode")
+                    } else {
+                        requestWriteSettingsPermission()
+                        result.error("PERMISSION_DENIED", "Write settings permission is required", null)
+                    }
+                }
+                "enableLightMode" -> {
+                    if (checkWriteSettingsPermission()) {
+                        adjustScreenBrightness(30) // 밝기 30 증가
+                        result.success("Brightness increased for Light Mode")
+                    } else {
+                        requestWriteSettingsPermission()
+                        result.error("PERMISSION_DENIED", "Write settings permission is required", null)
+                    }
+                }
+                "getOutApp" -> {
+                    finishAffinity() // 현재 앱의 모든 액티비티 종료
+                    result.success("App closed successfully")
                 }
                 else -> result.notImplemented()
             }
@@ -109,7 +182,6 @@ class MainActivity : FlutterActivity() {
                     val sanitizedNumber = additiveData.replace("\\s".toRegex(), "")
                     val intent = Intent(Intent.ACTION_DIAL).apply {
                         data = Uri.parse("tel:$sanitizedNumber")
-                        //addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
                     true
@@ -139,4 +211,36 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
+    private fun requestDoNotDisturbPermission() {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+        startActivity(intent)
+    }
+
+    private fun checkWriteSettingsPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.System.canWrite(applicationContext)
+        } else {
+            true
+        }
+    }
+
+    private fun requestWriteSettingsPermission() {
+        val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+            data = Uri.parse("package:$packageName")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    private fun adjustScreenBrightness(adjustment: Int) {
+        try {
+            val resolver: ContentResolver = contentResolver
+            val currentBrightness = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS)
+            val newBrightness = (currentBrightness + adjustment).coerceIn(0, 255) // 0~255 범위로 제한
+            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, newBrightness)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
 }
