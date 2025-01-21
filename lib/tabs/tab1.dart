@@ -149,6 +149,24 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
     String? matchedHanja;
 
+    // search hanja from _apps[]
+    for (var app in _apps) {
+      // spell + def + kor
+      String appSpell = app["spell"] ?? "";
+      String appDef = app["meaning"] ?? "";
+      String appKor = app["reading"] ?? "";
+
+      // normalize combined text
+      String combinedText = normalize("$appSpell$appDef$appKor");
+      print("Checking App Hanja: ${app['hanja']}, Combined Text: $combinedText");
+
+      if (combinedText == normalizedInput) {
+        matchedHanja = app["hanja"];
+        break;
+      }
+    }
+
+    // search hanja from dict.json
     widget.dict.forEach((hanja, details) {
       for (var detail in details) {
         // spell + def + kor
@@ -382,7 +400,10 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     ),
                   ],
                 ),
-                ...?widget.dict[_selectedHanja]?.map((e) {
+                ...(_apps.where((e) => e['hanja'] == _selectedHanja).isNotEmpty
+                    ? _apps.where((e) => e['hanja'] == _selectedHanja)
+                    : widget.dict[_selectedHanja] ?? []
+                ).map((e) {
                   return SingleChildScrollView(
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
@@ -399,7 +420,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                             ),
                           ),
                         Text(
-                          "${e["def"]} ",
+                          "${e["meaning"] ?? e["def"]} ",
                           style: const TextStyle(
                             fontSize: 40,
                             fontFamily: 'YunGothic',
@@ -407,7 +428,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                           ),
                         ),
                         Text(
-                          "${e["kor"]}",
+                          "${e["reading"] ?? e["kor"]}",
                           style: const TextStyle(
                             fontSize: 40,
                             fontFamily: 'YunGothic',
