@@ -17,32 +17,64 @@ class Tab2 extends StatefulWidget {
   _Tab2State createState() => _Tab2State();
 }
 
-class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
+class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.example.hanja_magic/apps');
   final List<Map<String, String>> _apps = [];
   final TextEditingController nameController = TextEditingController();
   List<String> installedAppNames = [];
   List<HanjaEntry> _allHanjaEntries = [];
   bool isLoading = true;
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  bool _isAnimationComplete = false;
 
   @override
   void initState() {
     super.initState();
 
-    // 1. dict.json 로드
+    // 데이터 로드
     _loadHanjaDictionary().then((_) {
-      // 2. 앱 목록 불러오기
       _fetchInstalledAppNames().then((_) {
         _loadApps().then((_) {
-          setState(() => isLoading = false);
+          // 최소 1초 애니메이션이 완료된 후 로딩 상태를 업데이트
+          if (_isAnimationComplete) {
+            setState(() => isLoading = false);
+          } else {
+            Future.delayed(const Duration(milliseconds: 700), () {
+              setState(() => isLoading = false);
+            });
+          }
         });
       });
     });
+
+    // AnimationController 초기화
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    // ScaleAnimation 정의
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 4.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    // 로딩 시작과 동시에 애니메이션 실행
+    _animationController.forward();
   }
 
   // AutomaticKeepAliveClientMixin을 쓰려면 override 필수
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   Future<void> _fetchInstalledAppNames() async {
     try {
@@ -449,12 +481,15 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
       ),
       body: isLoading
           ? Center(
+        child: ScaleTransition(
+          scale: _scaleAnimation,
           child: Image.asset(
             'assets/chunjamoon.png',
-            width: 200, // 원하는 크기
-            height: 200, // 원하는 크기
+            width: MediaQuery.of(context).size.width * 0.8,
+            height: MediaQuery.of(context).size.width * 0.8,
           ),
-        )
+        ),
+      )
         : Column(
           children: [
             Expanded(
