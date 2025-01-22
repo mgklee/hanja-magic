@@ -123,20 +123,25 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   }
 
   void configureTTS() async {
-    // Set language
+    // Set language to Korean
     await _flutterTts.setLanguage("ko-KR");
 
+    // Set a custom voice (if supported)
     await _flutterTts.setVoice({
-      "name": "ko-KR-SMTg01",
+      "name": "ko-KR-SMTg01", // 기본 목소리
       "locale": "kor-x-lvariant-g01",
     });
 
-    // Set speech rate
-    await _flutterTts.setSpeechRate(0.5); // 0.0 to 1.0
+    // Adjust speech rate for faster delivery (makes it feel urgent)
+    await _flutterTts.setSpeechRate(1.5); // 빠르게 읽기 (1.0 이상)
 
-    // Set pitch
-    await _flutterTts.setPitch(1.0); // 0.5 to 2.0
+    // Increase pitch for a higher, more intense tone
+    await _flutterTts.setPitch(2.0); // 높게 (2.0은 최대)
+
+    // Optionally, test this with a sample text
+    await _flutterTts.speak("뭐라고요? 정말 그렇게 생각하세요? 너무 화나요!");
   }
+
 
   void _findHanjaFromSpeech(String speechText) {
     // normalize spoken text
