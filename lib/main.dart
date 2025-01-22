@@ -104,6 +104,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+  Map<String, Map<String, String>> defaultHanjas = {
+    "光": {"method": "turnOnFlashlight", "description": "손전등을 켭니다."},
+    "消": {"method": "turnOffFlashlight", "description": "손전등을 끕니다."},
+    "音": {"method": "setSoundMode", "description": "소리 모드로 전환합니다."},
+    "震": {"method": "setVibrationMode", "description": "진동 모드로 전환합니다."},
+    "無": {"method": "setSilentMode", "description": "무음 모드로 전환합니다."},
+    "明": {"method": "setHighBrightness", "description": "밝기를 90%로 설정합니다."},
+    "中": {"method": "setMiddleBrightness", "description": "밝기를 50%로 설정합니다."},
+    "暗": {"method": "setLowBrightness", "description": "밝기를 10%로 설정합니다."},
+    "出": {"method": "getOutApp", "description": "앱을 나갑니다."},
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -113,8 +124,12 @@ class _HomePageState extends State<HomePage> {
         smp2trd: widget.smp2trd,
         interpreter: widget.interpreter,
         labels: widget.labels,
+        defaultHanjas: defaultHanjas,
       ),
-      Tab2(dict: widget.dict),
+      Tab2(
+        dict: widget.dict,
+        defaultHanjas: defaultHanjas,
+      ),
     ];
 
     return Scaffold(

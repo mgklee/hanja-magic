@@ -85,13 +85,13 @@ class MainActivity : FlutterActivity() {
                         result.error("FLASHLIGHT_ERROR", "Failed to turn off flashlight", e.message)
                     }
                 }
-                "setVibrationMode" -> {
-                    audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
-                    result.success("Vibration mode activated")
-                }
                 "setSoundMode" -> {
                     audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
                     result.success("Sound mode activated")
+                }
+                "setVibrationMode" -> {
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                    result.success("Vibration mode activated")
                 }
                 "setSilentMode" -> {
                     if (notificationManager.isNotificationPolicyAccessGranted) {
@@ -102,19 +102,28 @@ class MainActivity : FlutterActivity() {
                         result.error("PERMISSION_DENIED", "Do Not Disturb permission is required", null)
                     }
                 }
-                "enableDarkMode" -> {
+                "setHighBrightness" -> {
                     if (checkWriteSettingsPermission()) {
-                        adjustScreenBrightness(-30) // 밝기 30 감소
-                        result.success("Brightness decreased for Dark Mode")
+                        setScreenBrightness(230)
+                        result.success("Brightness increased for Light Mode")
                     } else {
                         requestWriteSettingsPermission()
                         result.error("PERMISSION_DENIED", "Write settings permission is required", null)
                     }
                 }
-                "enableLightMode" -> {
+                "setMiddleBrightness" -> {
                     if (checkWriteSettingsPermission()) {
-                        adjustScreenBrightness(30) // 밝기 30 증가
+                        setScreenBrightness(128)
                         result.success("Brightness increased for Light Mode")
+                    } else {
+                        requestWriteSettingsPermission()
+                        result.error("PERMISSION_DENIED", "Write settings permission is required", null)
+                    }
+                }
+                "setLowBrightness" -> {
+                    if (checkWriteSettingsPermission()) {
+                        setScreenBrightness(26)
+                        result.success("Brightness decreased for Dark Mode")
                     } else {
                         requestWriteSettingsPermission()
                         result.error("PERMISSION_DENIED", "Write settings permission is required", null)
@@ -176,10 +185,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun launchApp(packageName: String, extraData: String?): Boolean {
-        print("packageName is $packageName and extraData is $extraData")
         return when (packageName) {
             "com.samsung.android.dialer" -> {
-                print("packageName is $packageName and extraData is $extraData")
                 if (!extraData.isNullOrEmpty()) {
                     val sanitizedNumber = extraData.replace("\\s".toRegex(), "")
                     val intent = Intent(Intent.ACTION_DIAL).apply {
@@ -192,7 +199,6 @@ class MainActivity : FlutterActivity() {
                 }
             }
             "com.sec.android.app.sbrowser" -> {
-                print("packageName is $packageName and extraData is $extraData")
                 if (!extraData.isNullOrEmpty()) {
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         data = Uri.parse(extraData)
@@ -214,6 +220,7 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
+
     private fun requestDoNotDisturbPermission() {
         val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
         startActivity(intent)
@@ -235,15 +242,12 @@ class MainActivity : FlutterActivity() {
         startActivity(intent)
     }
 
-    private fun adjustScreenBrightness(adjustment: Int) {
+    private fun setScreenBrightness(brightness: Int) {
         try {
             val resolver: ContentResolver = contentResolver
-            val currentBrightness = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS)
-            val newBrightness = (currentBrightness + adjustment).coerceIn(0, 255) // 0~255 범위로 제한
-            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, newBrightness)
+            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, brightness)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-
 }
