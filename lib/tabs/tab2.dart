@@ -5,10 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class Tab2 extends StatefulWidget {
   final Map<String, dynamic> dict;
+  final Map<String, Map<String, String>> defaultHanjas;
 
   const Tab2({
     super.key,
     required this.dict,
+    required this.defaultHanjas,
   });
 
   @override
@@ -110,7 +112,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
     if (!installedAppNames.any(
       (name) => name.toLowerCase() == appName.toLowerCase())) {
       ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('App not found: $appName')));
+        .showSnackBar(SnackBar(content: Text('$appName을(를) 찾을 수 없습니다.')));
       return;
     }
     try {
@@ -205,6 +207,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
               return StatefulBuilder(
                 builder: (BuildContext context, StateSetter setState) {
                   return Dialog(
+                    backgroundColor: Colors.white,
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
@@ -297,15 +300,12 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                               // 중복 확인
                               final isDuplicate = _apps.any((app) => app['hanja'] == selectedHanja);
 
-                              if (isDuplicate || selectedHanja == "光" || selectedHanja == "消" ||
-                                                  selectedHanja == "明" || selectedHanja == "暗" ||
-                                                  selectedHanja == "音" || selectedHanja == "震" ||
-                                                  selectedHanja == "無" || selectedHanja == "出")
-                              {
+                              if (isDuplicate || widget.defaultHanjas.containsKey(selectedHanja)) {
                                 showDialog(
                                   context: context,
                                   builder: (BuildContext context) {
                                     return AlertDialog(
+                                      backgroundColor: Colors.white,
                                       title: Text('중복 경고'),
                                       content: Text('이미 등록한 한자입니다.'),
                                       actions: [
@@ -349,6 +349,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
             return Dialog(
+              backgroundColor: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -411,69 +412,108 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
   Widget build(BuildContext context) {
     super.build(context); // 추가
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: GestureDetector(
+              onTap: () => showAppSearchDialog(context),
+              child: Stack(
+                children: [
+                  Text(
+                    "加",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'HanyangHaeseo',
+                      foreground: Paint()
+                        ..style = PaintingStyle.stroke
+                        ..strokeWidth = 2 // Border thickness
+                        ..color = Color(0xFFDB7890), // Border color
+                    ),
+                  ),
+                  // Main text
+                  Text(
+                    "加",
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'HanyangHaeseo',
+                      color: Color(0xFFE392A3), // Text color
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       body: isLoading
         ? Center(child: CircularProgressIndicator())
         : Column(
           children: [
             Expanded(
-              child: ListView(
-                children: [
-                  for (int i = 0; i < _apps.length; i++)
-                    Dismissible(
-                      key: ValueKey(_apps[i]['hanja']),
-                      direction: DismissDirection.startToEnd,
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: 20.0),
-                        child: const Icon(
-                          Icons.delete,
-                          color: Colors.white,
-                        ),
-                      ),
-                      onDismissed: (direction) async {
-                        final removedApp = _apps[i];
-                        setState(() => _apps.removeAt(i));
-                        await _saveApps();
-
-                        // Snackbar with "Undo"
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${removedApp['name']}을(를) 제거했습니다.'),
-                            action: SnackBarAction(
-                              label: '실행 취소',
-                              onPressed: () {
-                                setState(() => _apps.insert(i, removedApp));
-                                _saveApps();
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                      child: CustomListTile(
-                        hanja: _apps[i]['hanja'] ?? '',
-                        spell: _apps[i]['spell'] ?? '',
-                        def: _apps[i]['def'] ?? '',
-                        kor: _apps[i]['kor'] ?? '',
-                        icon: _buildIcon(_apps[i]['icon'] ?? ''),
-                        onTap: (_apps[i]['package'] ?? '').isNotEmpty
-                          ? () => _launchApp(
-                            _apps[i]['package']!,
-                            _apps[i]['extraData'],
-                          )
-                          : null,
+              child: ListView.separated(
+                itemCount: _apps.length,
+                separatorBuilder: (BuildContext context, int index) {
+                  return Divider(
+                    color: Colors.grey, // Divider color
+                    thickness: 1.0,     // Divider thickness
+                    indent: 16.0,       // Space from the start
+                    endIndent: 16.0,    // Space from the end
+                  );
+                },
+                itemBuilder: (BuildContext context, int index) {
+                  return Dismissible(
+                    key: ValueKey(_apps[index]['hanja']),
+                    direction: DismissDirection.startToEnd,
+                    background: Container(
+                      color: Colors.red,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.only(left: 20.0),
+                      child: const Icon(
+                        Icons.delete,
+                        color: Colors.white,
                       ),
                     ),
-                ],
+                    onDismissed: (direction) async {
+                      final removedApp = _apps[index];
+                      setState(() => _apps.removeAt(index));
+                      await _saveApps();
+
+                      // Snackbar with "Undo"
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${removedApp['name']}을(를) 제거했습니다.'),
+                          action: SnackBarAction(
+                            label: '실행 취소',
+                            onPressed: () {
+                              setState(() => _apps.insert(index, removedApp));
+                              _saveApps();
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    child: CustomListTile(
+                      hanja: _apps[index]['hanja'] ?? '',
+                      spell: _apps[index]['spell'] ?? '',
+                      def: _apps[index]['def'] ?? '',
+                      kor: _apps[index]['kor'] ?? '',
+                      icon: _buildIcon(_apps[index]['icon'] ?? ''),
+                      onTap: (_apps[index]['package'] ?? '').isNotEmpty
+                        ? () => _launchApp(
+                          _apps[index]['package']!,
+                          _apps[index]['extraData'],
+                        )
+                        : null,
+                    ),
+                  );
+                }
               ),
             ),
           ],
         ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showAppSearchDialog(context),
-        child: Icon(Icons.add),
-      ),
     );
   }
 
@@ -518,7 +558,6 @@ class CustomListTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 50,
                   fontFamily: 'HanyangHaeseo',
-                  fontWeight: FontWeight.bold,
                   foreground: Paint()
                     ..style = PaintingStyle.stroke
                     ..strokeWidth = 2 // Border thickness
@@ -531,7 +570,6 @@ class CustomListTile extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 50,
                   fontFamily: 'HanyangHaeseo',
-                  fontWeight: FontWeight.bold,
                   color: Color(0xFFE392A3), // Text color
                 ),
               ),

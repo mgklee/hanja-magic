@@ -17,6 +17,7 @@ class Tab1 extends StatefulWidget {
   final Map<String, dynamic> smp2trd;
   final Interpreter interpreter;
   final List<String> labels;
+  final Map<String, Map<String, String>> defaultHanjas;
 
   const Tab1({
     super.key,
@@ -24,6 +25,7 @@ class Tab1 extends StatefulWidget {
     required this.smp2trd,
     required this.interpreter,
     required this.labels,
+    required this.defaultHanjas,
   });
 
   @override
@@ -33,11 +35,10 @@ class Tab1 extends StatefulWidget {
 class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.example.hanja_magic/apps');
   final List<Map<String, String>> _apps = [];
-  List<Offset?> _points = [];
+  final List<Offset?> _points = [];
   List<String> _recognizedHanja = [];
   String _selectedHanja = "";
-  double _scrollOffset = 0.0;
-  final ScrollController _scrollController = ScrollController();
+  TextEditingController _textController = TextEditingController();
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   final GlobalKey _canvasKey = GlobalKey();
@@ -51,7 +52,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     _loadApps();
-    _startAutoScroll();
     configureTTS();
 
     // Initialize the SpeechToText object
@@ -72,7 +72,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
   @override
   void dispose() {
-    _scrollController.dispose();
     _animationController.dispose();
     _flutterTts.stop();
     super.dispose();
@@ -100,26 +99,9 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       );
       if (!success) {
         ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Cannot launch $packageName')));
+          .showSnackBar(SnackBar(content: Text('$packageName을(를) 실행하는 데 실패했습니다.')));
       }
     } on PlatformException catch (_) {}
-  }
-
-  void _startAutoScroll() {
-    Timer.periodic(Duration(milliseconds: 50), (Timer timer) {
-      if (_scrollController.hasClients) {
-        final maxScrollExtent = _scrollController.position.maxScrollExtent;
-
-        if (_scrollOffset < maxScrollExtent) {
-          _scrollOffset += 2.0; // Adjust the scroll speed
-          _scrollController.animateTo(
-            _scrollOffset,
-            duration: Duration(milliseconds: 50),
-            curve: Curves.linear,
-          );
-        }
-      }
-    });
   }
 
   void configureTTS() async {
@@ -132,10 +114,10 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     });
 
     // Set speech rate
-    await _flutterTts.setSpeechRate(0.5); // 0.0 to 1.0
+    await _flutterTts.setSpeechRate(0.7); // 0.0 to 1.0
 
     // Set pitch
-    await _flutterTts.setPitch(1.0); // 0.5 to 2.0
+    await _flutterTts.setPitch(2.0); // 0.5 to 2.0
   }
 
   void _findHanjaFromSpeech(String speechText) {
@@ -210,6 +192,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
         _speech.listen(onResult: (result) {
           setState(() {
             _spokenText = result.recognizedWords;
+            _textController.text = _spokenText;
             print("spokenText is $_spokenText");
             if (_spokenText.isNotEmpty) {
               _findHanjaFromSpeech(_spokenText);
@@ -227,7 +210,10 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   // Stop listening
   void _stopListening() {
     _speech.stop();
-    setState(() => _isListening = false);
+    setState(() {
+      _isListening = false;
+      _textController.text = '';
+    });
   }
 
   Future<void> recognizeHanja() async {
@@ -353,27 +339,30 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       _animationController.forward(from: 0).then((_) {
         Future.delayed(
           const Duration(milliseconds: 1000),
-              () => setState(() => _selectedHanja = ""),
+            () => setState(() => _selectedHanja = ""),
         );
       });
       return; // 아래 코드로 내려가지 않도록
     }
 
-
     if (_isFromSP) {
-      final app = _apps.firstWhere((app) => app["hanja"] == _selectedHanja, orElse: () => {"spell": "", "def": "", "kor": ""},);
+      final app = _apps.firstWhere(
+        (app) => app["hanja"] == _selectedHanja,
+        orElse: () => {"spell": "", "def": "", "kor": ""},
+      );
       _flutterTts.speak('${app["spell"] ?? ""} ${app["def"] ?? ""} ${app["kor"] ?? ""}');
     }
-    else _flutterTts.speak('${widget.dict[_selectedHanja]?[0]["spell"] ?? ""} ${widget.dict[_selectedHanja]?[0]["def"] ?? ""} ${widget.dict[_selectedHanja]?[0]["kor"] ?? ""}');
+    else {
+      final hanjaInfo = widget.dict[_selectedHanja];
+      _flutterTts.speak('${hanjaInfo?[0]["spell"] ?? ""} ${hanjaInfo?[0]["def"] ?? ""} ${hanjaInfo?[0]["kor"] ?? ""}');
+    }
 
     _animationController.forward(from: 0).then((_) {
-      _scrollOffset = 0;
-
       Future.delayed(
         const Duration(milliseconds: 1000),
-        () {
+            () {
           Map<String, String>? matchingApp = _apps.firstWhere(
-            (app) => app["hanja"] == _selectedHanja, // Condition to match
+                (app) => app["hanja"] == _selectedHanja, // Condition to match
             orElse: () => {"hanja": ""}, // What to return if no match is found
           );
 
@@ -392,264 +381,343 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   }
 
   Future<void> defaultHanjaMagic(String hanja) async {
-    switch (hanja) {
-      case "光":
-        await platform.invokeMethod('turnOnFlashlight');
-        break;
-      case "消":
-        await platform.invokeMethod('turnOffFlashlight');
-        break;
-      case "震":
-        await platform.invokeMethod('setVibrationMode');
-        break;
-      case "音":
-        await platform.invokeMethod('setSoundMode');
-        break;
-      case "無":
-        await platform.invokeMethod('setSilentMode');
-        break;
-      case "暗":
-        await platform.invokeMethod('enableDarkMode');
-        break;
-      case "明":
-        await platform.invokeMethod('enableLightMode');
-        break;
-      case "出":
-        await platform.invokeMethod('getOutApp');
-        break;
+    if (widget.defaultHanjas[hanja] != null) {
+      await platform.invokeMethod(widget.defaultHanjas[hanja]!["method"]!);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    TextEditingController textController = TextEditingController();
-    List<String> specialHanjas = ["友", "信", "勇", "敬", "忍", "學", "孝", "希", "情", "心"];
-
-    return Center(
-      child: SingleChildScrollView(
-        child: _selectedHanja.isNotEmpty
-          ? ScaleTransition(
-            scale: _scaleAnimation,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
+  void showInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          titlePadding: EdgeInsets.only(top: 16, left: 24, right: 24),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Position elements on opposite ends
+            children: [
+              Text('기본 기능'), // Dialog title
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(), // Close the dialog
+                child: Stack(
                   children: [
-                    // Text with border effect
                     Text(
-                      _selectedHanja,
+                      "出",
                       style: TextStyle(
-                        fontSize: 300,
+                        fontSize: 30,
                         fontFamily: 'HanyangHaeseo',
-                        fontWeight: FontWeight.bold,
                         foreground: Paint()
                           ..style = PaintingStyle.stroke
-                          ..strokeWidth = 4 // Border thickness
-                          ..color = specialHanjas.contains(_selectedHanja)
-                            ? Color(0xFF80B23D)
-                            : Color(0xFFDB7890), // Border color
+                          ..strokeWidth = 2 // Border thickness
+                          ..color = Color(0xFFDB7890), // Border color
                       ),
                     ),
                     // Main text
                     Text(
-                      _selectedHanja,
-                      style: TextStyle(
-                        fontSize: 300,
+                      "出",
+                      style: const TextStyle(
+                        fontSize: 30,
                         fontFamily: 'HanyangHaeseo',
-                        fontWeight: FontWeight.bold,
-                        color: specialHanjas.contains(_selectedHanja)
-                          ? Color(0xFFA6CB5B)
-                          : Color(0xFFE392A3), // Text color
-                      ),
-                    ),
-                  ],
-                ),
-                ...?(
-                    _isFromSP
-                        ? _apps.where((e) => e['hanja'] == _selectedHanja)
-                        : widget.dict[_selectedHanja] ?? []
-                ).map((e) {
-                  return SingleChildScrollView(
-                    controller: _scrollController,
-                    scrollDirection: Axis.horizontal,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (e["spell"] != null)
-                          Text(
-                            "${e["spell"]} ",
-                            style: const TextStyle(
-                              fontSize: 30,
-                              fontFamily: 'YunGothic',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "${e["def"]} ",
-                              style: const TextStyle(
-                                fontSize: 40,
-                                fontFamily: 'YunGothic',
-                                color: Color(0xFF0177C4),
-                              ),
-                            ),
-                            Text(
-                              "${e["kor"]}",
-                              style: const TextStyle(
-                                fontSize: 40,
-                                fontFamily: 'YunGothic',
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0177C4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }) ?? [],
-              ],
-            ),
-          )
-          : Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 300,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SizedBox(
-                      height: 300,
-                      child: GestureDetector(
-                        onPanUpdate: (details) {
-                          final RenderBox renderBox =
-                          _canvasKey.currentContext!.findRenderObject() as RenderBox;
-                          final canvasSize = renderBox.size;
-
-                          // Restrict the points within the canvas bounds
-                          final localPosition = details.localPosition;
-                          if (localPosition.dx >= 7 &&
-                              localPosition.dy >= 7 &&
-                              localPosition.dx <= canvasSize.width - 15 &&
-                              localPosition.dy <= canvasSize.height - 15) {
-                            setState(() => _points.add(localPosition));
-                          }
-                        },
-                        onPanEnd: (_) {
-                          setState(() => _points.add(null)); // Separate strokes
-                        },
-                        child: Container(
-                          key: _canvasKey, // Assign the key to the canvas container
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            border: Border.all(color: Colors.green, width: 4.0),
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: CustomPaint(
-                            size: Size.infinite,
-                            painter: HandwritingPainter(_points),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.mic),
-                          color: _isListening ? Colors.red : Colors.green,
-                          onPressed: _isListening ? _stopListening : _startListening,
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.search),
-                          onPressed: () => recognizeHanja(),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.undo),
-                          onPressed: () {
-                            setState(() {
-                              if (_points.isNotEmpty) {
-                                int lastStrokeIndex = _points.sublist(0, _points.length - 1).lastIndexOf(null);
-                                if (lastStrokeIndex != -1) {
-                                  _points.removeRange(lastStrokeIndex, _points.length - 1);
-                                } else {
-                                  _points.clear();
-                                }
-                              }
-                            });
-                          },
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _points.clear();
-                              _recognizedHanja = [];
-                              _selectedHanja = "";
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    // Display spoken text (optional)
-                    if (_spokenText.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          "Spoken Text: $_spokenText",
-                          style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TextField(
-                        controller: textController,
-                        decoration: const InputDecoration(
-                          labelText: "한자를 입력하세요",
-                          border: OutlineInputBorder(),
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'^[\u4E00-\u9FFF]$'), // Allows only one Chinese character
-                          ),
-                        ],
-                        maxLength: 1, // Limits input to one character
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            _isFromSP = _apps.any((e) => e['hanja'] == value);
-                              _showHanja(value); // Show the typed Hanja
-                            textController.clear(); // Clear the text field after submission
-                          }
-                        },
+                        color: Color(0xFFE392A3), // Text color
                       ),
                     ),
                   ],
                 ),
               ),
-              if (_recognizedHanja.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Wrap(
-                    spacing: 8.0,
-                    children: _recognizedHanja.map((hanja) {
-                      return TextButton(
-                        onPressed: () {
-                          _simpleToTraditional(hanja.trim());
-                          _showHanja(hanja.trim());
-                        },
-                        child: Text(
-                          hanja,
-                          style: TextStyle(fontSize: 18)
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
             ],
           ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: widget.defaultHanjas.length * 2 - 1, // Include dividers
+                    itemBuilder: (context, index) {
+                      if (index.isEven) {
+                        // For even indices, return the CustomListTile
+                        final key = widget.defaultHanjas.keys.elementAt(index ~/ 2);
+                        final hanjaDetails = widget.defaultHanjas[key]!;
+                        return CustomListTile(
+                          hanja: key,
+                          spell: widget.dict[key][0]['spell'],
+                          def: widget.dict[key][0]['def'],
+                          kor: widget.dict[key][0]['kor'],
+                          description: hanjaDetails["description"]!,
+                        );
+                      } else {
+                        // For odd indices, return a Divider
+                        return Divider(
+                          color: Colors.grey,
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<String> specialHanjas = ["友", "信", "勇", "敬", "忍", "學", "孝", "希", "情", "心"];
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned(
+            top: 38.0, // Adjust the top margin as needed
+            right: 16.0, // Adjust the right margin as needed
+            child: GestureDetector(
+              onTap: () => showInfoDialog(context),
+              child: Stack(
+                children: [
+                  Text(
+                    "告",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'HanyangHaeseo',
+                      foreground: Paint()
+                        ..style = PaintingStyle.stroke
+                        ..strokeWidth = 2 // Border thickness
+                        ..color = Color(0xFFDB7890), // Border color
+                    ),
+                  ),
+                  // Main text
+                  Text(
+                    "告",
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'HanyangHaeseo',
+                      color: Color(0xFFE392A3), // Text color
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              child: _selectedHanja.isNotEmpty
+                ? ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Stack(
+                        children: [
+                          // Text with border effect
+                          Text(
+                            _selectedHanja,
+                            style: TextStyle(
+                              fontSize: 300,
+                              fontFamily: 'HanyangHaeseo',
+                              fontWeight: FontWeight.bold,
+                              foreground: Paint()
+                                ..style = PaintingStyle.stroke
+                                ..strokeWidth = 4 // Border thickness
+                                ..color = specialHanjas.contains(_selectedHanja)
+                                  ? Color(0xFF80B23D)
+                                  : Color(0xFFDB7890), // Border color
+                            ),
+                          ),
+                          // Main text
+                          Text(
+                            _selectedHanja,
+                            style: TextStyle(
+                              fontSize: 300,
+                              fontFamily: 'HanyangHaeseo',
+                              fontWeight: FontWeight.bold,
+                              color: specialHanjas.contains(_selectedHanja)
+                                ? Color(0xFFA6CB5B)
+                                : Color(0xFFE392A3), // Text color
+                            ),
+                          ),
+                        ],
+                      ),
+                      ...?(
+                        _isFromSP
+                          ? _apps.where((e) => e['hanja'] == _selectedHanja)
+                          : widget.dict[_selectedHanja] ?? []
+                      ).map((e) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (e["spell"] != null)
+                              Text(
+                                "${e["spell"]} ",
+                                style: const TextStyle(
+                                  fontSize: 30,
+                                  fontFamily: 'YunGothic',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  "${e["def"]} ",
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    fontFamily: 'YunGothic',
+                                    color: Color(0xFF0177C4),
+                                  ),
+                                ),
+                                Text(
+                                  "${e["kor"]}",
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    fontFamily: 'YunGothic',
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0177C4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      }) ?? [],
+                    ],
+                  ),
+                )
+                : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 300,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          TextField(
+                            controller: _textController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(),
+                              counterText: '',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _isListening ? Icons.mic : Icons.mic_none,
+                                  color: _isListening ? Colors.red : Colors.green,
+                                ),
+                                onPressed: _isListening ? _stopListening : _startListening,
+                              ),
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^[\u4E00-\u9FFF]$'), // Allows only one Chinese character
+                              ),
+                            ],
+                            maxLength: 1, // Limits input to one character
+                            onSubmitted: (value) {
+                              if (value.isNotEmpty) {
+                                _isFromSP = _apps.any((e) => e['hanja'] == value);
+                                _showHanja(value); // Show the typed Hanja
+                                _textController.clear(); // Clear the text field after submission
+                              }
+                            },
+                          ),
+                          SizedBox(height: 10),
+                          SizedBox(
+                            height: 300,
+                            child: GestureDetector(
+                              onPanUpdate: (details) {
+                                final RenderBox renderBox =
+                                _canvasKey.currentContext!.findRenderObject() as RenderBox;
+                                final canvasSize = renderBox.size;
+
+                                // Restrict the points within the canvas bounds
+                                final localPosition = details.localPosition;
+                                if (
+                                  localPosition.dx >= 7 &&
+                                  localPosition.dy >= 7 &&
+                                  localPosition.dx <= canvasSize.width - 15 &&
+                                  localPosition.dy <= canvasSize.height - 15
+                                ) {
+                                  setState(() => _points.add(localPosition));
+                                }
+                              },
+                              onPanEnd: (_) {
+                                setState(() => _points.add(null)); // Separate strokes
+                              },
+                              child: Container(
+                                key: _canvasKey, // Assign the key to the canvas container
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  border: Border.all(color: Colors.green, width: 4.0),
+                                  borderRadius: BorderRadius.circular(8.0),
+                                ),
+                                child: CustomPaint(
+                                  size: Size.infinite,
+                                  painter: HandwritingPainter(_points),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.search),
+                                onPressed: recognizeHanja,
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.undo),
+                                onPressed: () {
+                                  setState(() {
+                                    if (_points.isNotEmpty) {
+                                      int lastStrokeIndex = _points.sublist(0, _points.length - 1).lastIndexOf(null);
+                                      if (lastStrokeIndex != -1) {
+                                        _points.removeRange(lastStrokeIndex, _points.length - 1);
+                                      } else {
+                                        _points.clear();
+                                      }
+                                    }
+                                  });
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _points.clear();
+                                    _recognizedHanja = [];
+                                    _selectedHanja = "";
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_recognizedHanja.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Wrap(
+                          spacing: 8.0,
+                          children: _recognizedHanja.map((hanja) {
+                            return TextButton(
+                              onPressed: () {
+                                _simpleToTraditional(hanja.trim());
+                                _showHanja(hanja.trim());
+                              },
+                              child: Text(
+                                hanja,
+                                style: TextStyle(fontSize: 18)
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
+                ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -722,5 +790,96 @@ class HandwritingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
+  }
+}
+
+class CustomListTile extends StatelessWidget {
+  final String hanja;
+  final String spell;
+  final String def;
+  final String kor;
+  final String description;
+
+  const CustomListTile({
+    super.key,
+    required this.hanja,
+    required this.spell,
+    required this.def,
+    required this.kor,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Stack(
+          children: [
+            Text(
+              "$hanja ",
+              style: TextStyle(
+                fontSize: 50,
+                fontFamily: 'HanyangHaeseo',
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 2 // Border thickness
+                  ..color = Color(0xFFDB7890), // Border color
+              ),
+            ),
+            // Main text
+            Text(
+              "$hanja ",
+              style: const TextStyle(
+                fontSize: 50,
+                fontFamily: 'HanyangHaeseo',
+                color: Color(0xFFE392A3), // Text color
+              ),
+            ),
+          ],
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    spell,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontFamily: 'YunGothic',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    " $def ",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontFamily: 'YunGothic',
+                      color: Color(0xFF0177C4),
+                    ),
+                  ),
+                  Text(
+                    kor,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontFamily: 'YunGothic',
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0177C4),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
