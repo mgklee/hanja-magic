@@ -57,9 +57,9 @@ class MainActivity : FlutterActivity() {
                 }
                 "launchApp" -> {
                     val packageName = call.argument<String>("packageName")
-                    val additiveData = call.argument<String>("additivedata")
+                    val extraData = call.argument<String>("extraData")
                     if (packageName != null) {
-                        val success = launchApp(packageName, additiveData)
+                        val success = launchApp(packageName, extraData)
                         result.success(success)
                     } else {
                         result.error("INVALID_PACKAGE", "Package name is null or invalid.", null)
@@ -175,11 +175,13 @@ class MainActivity : FlutterActivity() {
         return null
     }
 
-    private fun launchApp(packageName: String, additiveData: String?): Boolean {
+    private fun launchApp(packageName: String, extraData: String?): Boolean {
+        print("packageName is $packageName and extraData is $extraData")
         return when (packageName) {
             "com.samsung.android.dialer" -> {
-                if (!additiveData.isNullOrEmpty()) {
-                    val sanitizedNumber = additiveData.replace("\\s".toRegex(), "")
+                print("packageName is $packageName and extraData is $extraData")
+                if (!extraData.isNullOrEmpty()) {
+                    val sanitizedNumber = extraData.replace("\\s".toRegex(), "")
                     val intent = Intent(Intent.ACTION_DIAL).apply {
                         data = Uri.parse("tel:$sanitizedNumber")
                     }
@@ -190,9 +192,10 @@ class MainActivity : FlutterActivity() {
                 }
             }
             "com.sec.android.app.sbrowser" -> {
-                if (!additiveData.isNullOrEmpty()) {
+                print("packageName is $packageName and extraData is $extraData")
+                if (!extraData.isNullOrEmpty()) {
                     val intent = Intent(Intent.ACTION_VIEW).apply {
-                        data = Uri.parse(additiveData)
+                        data = Uri.parse(extraData)
                     }
                     startActivity(intent)
                     true

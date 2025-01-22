@@ -153,8 +153,8 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     for (var app in _apps) {
       // spell + def + kor
       String appSpell = app["spell"] ?? "";
-      String appDef = app["meaning"] ?? "";
-      String appKor = app["reading"] ?? "";
+      String appDef = app["def"] ?? "";
+      String appKor = app["kor"] ?? "";
 
       // normalize combined text
       String combinedText = normalize("$appSpell$appDef$appKor");
@@ -319,8 +319,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     return filePath;
   }
 
-  void _showHanja(String hanja) {
-    bool isInApps = _apps.any((app) => app["hanja"] == hanja);
+  void _simpleToTraditional(String hanja) {
     setState(() {
       _points.clear();
       _recognizedHanja = [];
@@ -329,7 +328,20 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       } else {
         _selectedHanja = hanja;
       }
-      _isFromSP = isInApps;
+
+    });
+    _isFromSP = _apps.any((e) => e['hanja'] == _selectedHanja);
+  }
+
+  void _showHanja(String hanja) {
+    setState(() {
+      _points.clear();
+      _recognizedHanja = [];
+      if (widget.smp2trd.containsKey(hanja)) {
+        _selectedHanja = widget.smp2trd[hanja]!;
+      } else {
+        _selectedHanja = hanja;
+      }
     });
 
     final dictEntry = widget.dict[_selectedHanja];
@@ -347,7 +359,12 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       return; // 아래 코드로 내려가지 않도록
     }
 
-    _flutterTts.speak('${widget.dict[_selectedHanja]?[0]["spell"] ?? ""} ${widget.dict[_selectedHanja]?[0]["def"] ?? ""} ${widget.dict[_selectedHanja]?[0]["kor"] ?? ""}');
+
+    if (_isFromSP) {
+      final app = _apps.firstWhere((app) => app["hanja"] == _selectedHanja, orElse: () => {"spell": "", "def": "", "kor": ""},);
+      _flutterTts.speak('${app["spell"] ?? ""} ${app["def"] ?? ""} ${app["kor"] ?? ""}');
+    }
+    else _flutterTts.speak('${widget.dict[_selectedHanja]?[0]["spell"] ?? ""} ${widget.dict[_selectedHanja]?[0]["def"] ?? ""} ${widget.dict[_selectedHanja]?[0]["kor"] ?? ""}');
 
     _animationController.forward(from: 0).then((_) {
       _scrollOffset = 0;
@@ -385,7 +402,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       case "震":
         await platform.invokeMethod('setVibrationMode');
         break;
-      case "音":;
+      case "音":
         await platform.invokeMethod('setSoundMode');
         break;
       case "無":
@@ -602,7 +619,8 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                         maxLength: 1, // Limits input to one character
                         onSubmitted: (value) {
                           if (value.isNotEmpty) {
-                            _showHanja(value); // Show the typed Hanja
+                            _isFromSP = _apps.any((e) => e['hanja'] == value);
+                              _showHanja(value); // Show the typed Hanja
                             textController.clear(); // Clear the text field after submission
                           }
                         },
@@ -618,7 +636,10 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     spacing: 8.0,
                     children: _recognizedHanja.map((hanja) {
                       return TextButton(
-                        onPressed: () => _showHanja(hanja),
+                        onPressed: () {
+                          _simpleToTraditional(hanja.trim());
+                          _showHanja(hanja.trim());
+                        },
                         child: Text(
                           hanja,
                           style: TextStyle(fontSize: 18)
