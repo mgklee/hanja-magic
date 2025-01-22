@@ -297,7 +297,11 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
                               // 중복 확인
                               final isDuplicate = _apps.any((app) => app['hanja'] == selectedHanja);
 
-                              if (isDuplicate) {
+                              if (isDuplicate || selectedHanja == "光" || selectedHanja == "消" ||
+                                                  selectedHanja == "明" || selectedHanja == "暗" ||
+                                                  selectedHanja == "音" || selectedHanja == "震" ||
+                                                  selectedHanja == "無" || selectedHanja == "出")
+                              {
                                 showDialog(
                                   context: context,
                                   builder: (BuildContext context) {
