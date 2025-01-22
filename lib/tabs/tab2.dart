@@ -480,15 +480,33 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
         ],
       ),
       body: isLoading
-          ? Center(
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: Image.asset(
-            'assets/chunjamoon.png',
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.width * 0.8,
+          ? Stack(
+        children: [
+          Container(
+            color: Colors.white,
           ),
-        ),
+          // 집중선 이미지
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.8, // 투명도 조정
+              child: Image.asset(
+                'assets/focus.jpg',
+                fit: BoxFit.cover, // 화면 전체에 이미지 채우기
+              ),
+            ),
+          ),
+          // 애니메이션 이미지
+          Center(
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Image.asset(
+                'assets/chunjamoon.png',
+                width: MediaQuery.of(context).size.width * 0.8,
+                height: MediaQuery.of(context).size.width * 0.8,
+              ),
+            ),
+          ),
+        ],
       )
         : Column(
           children: [
