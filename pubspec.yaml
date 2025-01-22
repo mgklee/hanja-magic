@@ -76,10 +76,14 @@ flutter:
     - assets/smp2trd.json
     - assets/model.tflite
     - assets/labels.txt
+    - assets/wukong.png
+    - assets/yeo.png
+    - assets/chunjamoon.png
     - assets/fonts/UNI_HSR.ttf
     - assets/fonts/HANYGO230.ttf
     - assets/fonts/HANYGO250.ttf
     - assets/fonts/HANYoonGothic760.ttf
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

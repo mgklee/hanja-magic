@@ -448,18 +448,22 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin {
         ],
       ),
       body: isLoading
-        ? Center(child: CircularProgressIndicator())
+          ? Center(
+          child: Image.asset(
+            'assets/chunjamoon.png',
+            width: 200, // 원하는 크기
+            height: 200, // 원하는 크기
+          ),
+        )
         : Column(
           children: [
             Expanded(
               child: ListView.separated(
                 itemCount: _apps.length,
                 separatorBuilder: (BuildContext context, int index) {
-                  return Divider(
-                    color: Colors.grey, // Divider color
-                    thickness: 1.0,     // Divider thickness
-                    indent: 16.0,       // Space from the start
-                    endIndent: 16.0,    // Space from the end
+                  return Image.asset(
+                    'assets/yeo.png',
+                    width: 600,
                   );
                 },
                 itemBuilder: (BuildContext context, int index) {
@@ -589,24 +593,33 @@ class CustomListTile extends StatelessWidget {
                     ),
                   ),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      "$def ",
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontFamily: 'YunGothic',
-                        color: Color(0xFF0177C4),
+                    Baseline(
+                    baseline: 20.0,
+                    baselineType: TextBaseline.alphabetic,
+                      child: Text(
+                        "$def ",
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontFamily: 'YunGothic',
+                          color: Color(0xFF0177C4),
+                        ),
                       ),
                     ),
-                    Text(
-                      kor,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontFamily: 'YunGothic',
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0177C4),
+                    Baseline(
+                    baseline: 20.0,
+                    baselineType: TextBaseline.alphabetic,
+                      child: Text(
+                        kor,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontFamily: 'YunGothic',
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0177C4),
+                        ),
                       ),
-                    ),
+                    )
                   ],
                 ),
               ],
