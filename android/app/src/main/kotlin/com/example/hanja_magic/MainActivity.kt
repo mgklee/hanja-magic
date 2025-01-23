@@ -20,11 +20,17 @@ import android.provider.Settings
 import android.app.UiModeManager
 import android.os.Build
 import android.content.ContentResolver
+import android.Manifest
+import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+
+
 
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.hanja_magic/apps"
     private var isFlashlightOn = false
+    private val REQUEST_CALL_PERMISSION = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -187,13 +193,21 @@ class MainActivity : FlutterActivity() {
     private fun launchApp(packageName: String, extraData: String?): Boolean {
         return when (packageName) {
             "com.samsung.android.dialer" -> {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CALL_PHONE), REQUEST_CALL_PERMISSION)
+                }
                 if (!extraData.isNullOrEmpty()) {
                     val sanitizedNumber = extraData.replace("\\s".toRegex(), "")
-                    val intent = Intent(Intent.ACTION_DIAL).apply {
+                    val intent = Intent(Intent.ACTION_CALL).apply {
                         data = Uri.parse("tel:$sanitizedNumber")
                     }
-                    startActivity(intent)
-                    true
+                    if (checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                        startActivity(intent)
+                        true
+                    } else {
+                        // 권한이 없는 경우 false 반환
+                        false
+                    }
                 } else {
                     false
                 }

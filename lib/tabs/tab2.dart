@@ -444,7 +444,9 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
   Widget build(BuildContext context) {
     super.build(context); // 추가
     return Scaffold(
-      appBar: AppBar(
+      appBar: isLoading
+      ? null
+      : AppBar(
         backgroundColor: Colors.white,
         actions: [
           Padding(
