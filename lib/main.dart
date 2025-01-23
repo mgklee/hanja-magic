@@ -74,7 +74,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: Color(0xffFFFFFF),
         splashColor: Colors.transparent,
       ),
-      home: SplashScreenWrapper(
+      home: HomePage(
         dict: dict,
         smp2trd: smp2trd,
         interpreter: interpreter,
@@ -104,6 +104,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+  bool _showSplashScreen = true;
   Map<String, Map<String, String>> defaultHanjas = {
     "光": {"method": "turnOnFlashlight", "description": "손전등을 켭니다."},
     "消": {"method": "turnOffFlashlight", "description": "손전등을 끕니다."},
@@ -117,7 +118,22 @@ class _HomePageState extends State<HomePage> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    Future.delayed(
+      Duration(milliseconds: 1500),
+      () {
+        setState(() => _showSplashScreen = false);
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_showSplashScreen) {
+      return SplashScreen();
+    }
+
     final List<Widget> tabs = [
       Tab1(
         dict: widget.dict,
@@ -135,21 +151,25 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Color(0xffE3ECEC),
+        backgroundColor: Colors.transparent,
         currentIndex: _currentIndex,
         elevation: 0,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.draw),
+            icon: Icon(
+              Icons.draw,
+              color: Color(0xFF0177C4),
+            ),
             label: "",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.list),
+            icon: Icon(
+              Icons.list,
+              color: Color(0xFF0177C4),
+            ),
             label: "",
           ),
         ],
@@ -160,53 +180,9 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class SplashScreenWrapper extends StatefulWidget {
-  final Map<String, dynamic> dict;
-  final Map<String, dynamic> smp2trd;
-  final Interpreter interpreter;
-  final List<String> labels;
-
-  const SplashScreenWrapper({
-    super.key,
-    required this.dict,
-    required this.smp2trd,
-    required this.interpreter,
-    required this.labels,
-  });
-
-  @override
-  State<SplashScreenWrapper> createState() => _SplashScreenWrapperState();
-}
-
-class _SplashScreenWrapperState extends State<SplashScreenWrapper> {
-  @override
-  void initState() {
-    super.initState();
-    _navigateToHome();
-  }
-
-  void _navigateToHome() async {
-    await Future.delayed(Duration(milliseconds: 1500));
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HomePage(
-          dict: widget.dict,
-          smp2trd: widget.smp2trd,
-          interpreter: widget.interpreter,
-          labels: widget.labels,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SplashScreen(); // SplashScreen 위젯 표시
-  }
-}
-
 class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

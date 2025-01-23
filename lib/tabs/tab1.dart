@@ -11,6 +11,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../styled_hanja.dart';
 
 class Tab1 extends StatefulWidget {
   final Map<String, dynamic> dict;
@@ -38,7 +39,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
   final List<Offset?> _points = [];
   List<String> _recognizedHanja = [];
   String _selectedHanja = "";
-  TextEditingController _textController = TextEditingController();
+  final TextEditingController _textController = TextEditingController();
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<Offset> _slideAnimation;
@@ -107,8 +108,12 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
         {'packageName': packageName, 'extraData': extraData ?? "",}
       );
       if (!success) {
-        ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$packageName을(를) 실행하는 데 실패했습니다.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$packageName을(를) 실행하는 데 실패했습니다.'),
+            duration: Duration(seconds: 1),
+          ),
+        );
       }
     } on PlatformException catch (_) {}
   }
@@ -181,7 +186,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     // get result
     if (matchedHanja != null) {
       print("Matched Hanja: $matchedHanja");
-      _showHanja(matchedHanja!);
+      _showHanja(matchedHanja!, true);
     } else {
       print("No matching Hanja found for $speechText");
     }
@@ -314,45 +319,24 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     return filePath;
   }
 
-  void _simpleToTraditional(String hanja) {
-    setState(() {
-      _points.clear();
-      _recognizedHanja = [];
-      if (widget.smp2trd.containsKey(hanja)) {
-        _selectedHanja = widget.smp2trd[hanja]!;
-      } else {
-        _selectedHanja = hanja;
-      }
-
-    });
-    _isFromSP = _apps.any((e) => e['hanja'] == _selectedHanja);
-  }
-
-  void _showHanja(String hanja) {
-    setState(() {
-      _points.clear();
-      _recognizedHanja = [];
-      if (widget.smp2trd.containsKey(hanja)) {
-        _selectedHanja = widget.smp2trd[hanja]!;
-      } else {
-        _selectedHanja = hanja;
-      }
-    });
-
-    final dictEntry = widget.dict[_selectedHanja];
-    if (dictEntry == null) {
-      // dict에 전혀 없는 한자를 입력한 경우
-      // 1) 음성으로 안내하고(또는 아무것도 안 하고),
-      // 2) 혹시 애니메이션이라도 보여주고 싶다면 (한자만 표시)
+  void _showHanja(String value, bool isFromSpeech) {
+    if (!widget.smp2trd.containsKey(value) && widget.dict[value] == null) {
       _flutterTts.speak("등록되지 않은 한자입니다.");
-      _animationController.forward(from: 0).then((_) {
-        Future.delayed(
-          const Duration(milliseconds: 1000),
-            () => setState(() => _selectedHanja = ""),
-        );
-      });
-      return; // 아래 코드로 내려가지 않도록
+      return;
     }
+
+    setState(() {
+      _points.clear();
+      _recognizedHanja = [];
+      if (widget.smp2trd.containsKey(value)) {
+        _selectedHanja = widget.smp2trd[value]!;
+      } else {
+        _selectedHanja = value;
+      }
+      if (!isFromSpeech) {
+        _isFromSP = _apps.any((e) => e['hanja'] == _selectedHanja);
+      }
+    });
 
     if (_isFromSP) {
       final app = _apps.firstWhere(
@@ -360,8 +344,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
         orElse: () => {"spell": "", "def": "", "kor": ""},
       );
       _flutterTts.speak('${app["spell"] ?? ""} ${app["def"] ?? ""} ${app["kor"] ?? ""}');
-    }
-    else {
+    } else {
       final hanjaInfo = widget.dict[_selectedHanja];
       _flutterTts.speak('${hanjaInfo?[0]["spell"] ?? ""} ${hanjaInfo?[0]["def"] ?? ""} ${hanjaInfo?[0]["kor"] ?? ""}');
     }
@@ -369,31 +352,35 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
     _animationController.forward(from: 0).then((_) {
       Future.delayed(
         const Duration(milliseconds: 1000),
-            () {
+          () async {
           Map<String, String>? matchingApp = _apps.firstWhere(
-                (app) => app["hanja"] == _selectedHanja, // Condition to match
+            (app) => app["hanja"] == _selectedHanja, // Condition to match
             orElse: () => {"hanja": ""}, // What to return if no match is found
           );
 
-          defaultHanjaMagic(hanja);
-
-          if (matchingApp["hanja"] != "" && _isFromSP) {
+          // defaultHanjaMagic(_selectedHanja);
+          if (widget.defaultHanjas[_selectedHanja] != null) {
+            await platform.invokeMethod(widget.defaultHanjas[_selectedHanja]!["method"]!);
+          } else if (matchingApp["hanja"] != "" && _isFromSP) {
             _launchApp(matchingApp['package']!, matchingApp['extraData']);
           } else {
             print("No matching app found");
           }
 
-          setState(() => _selectedHanja = "");
+          setState(() {
+            _selectedHanja = "";
+            _stopListening();
+          });
         }
       );
     });
   }
 
-  Future<void> defaultHanjaMagic(String hanja) async {
-    if (widget.defaultHanjas[hanja] != null) {
-      await platform.invokeMethod(widget.defaultHanjas[hanja]!["method"]!);
-    }
-  }
+  // Future<void> defaultHanjaMagic(String hanja) async {
+  //   if (widget.defaultHanjas[hanja] != null) {
+  //     await platform.invokeMethod(widget.defaultHanjas[hanja]!["method"]!);
+  //   }
+  // }
 
   void showInfoDialog(BuildContext context) {
     showDialog(
@@ -408,30 +395,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
               Text('기본 기능'), // Dialog title
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(), // Close the dialog
-                child: Stack(
-                  children: [
-                    Text(
-                      "出",
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontFamily: 'HanyangHaeseo',
-                        foreground: Paint()
-                          ..style = PaintingStyle.stroke
-                          ..strokeWidth = 2 // Border thickness
-                          ..color = Color(0xFFDB7890), // Border color
-                      ),
-                    ),
-                    // Main text
-                    Text(
-                      "出",
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontFamily: 'HanyangHaeseo',
-                        color: Color(0xFFE392A3), // Text color
-                      ),
-                    ),
-                  ],
-                ),
+                child: StyledHanja(text: "出"),
               ),
             ],
           ),
@@ -484,30 +448,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
             right: 16.0, // Adjust the right margin as needed
             child: GestureDetector(
               onTap: () => showInfoDialog(context),
-              child: Stack(
-                children: [
-                  Text(
-                    "告",
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'HanyangHaeseo',
-                      foreground: Paint()
-                        ..style = PaintingStyle.stroke
-                        ..strokeWidth = 2 // Border thickness
-                        ..color = Color(0xFFDB7890), // Border color
-                    ),
-                  ),
-                  // Main text
-                  Text(
-                    "告",
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'HanyangHaeseo',
-                      color: Color(0xFFE392A3), // Text color
-                    ),
-                  ),
-                ],
-              ),
+              child: StyledHanja(text: "告"),
             ),
           ),
           Center(
@@ -626,13 +567,20 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                         children: [
                           TextField(
                             controller: _textController,
+                            cursorColor: Color(0xFFDB7890),
                             decoration: InputDecoration(
                               border: OutlineInputBorder(),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                              ),
                               counterText: '',
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _isListening ? Icons.mic : Icons.mic_none,
-                                  color: _isListening ? Colors.red : Colors.green,
+                                  color: _isListening ? Color(0xFFDB7890) : Colors.grey[800],
                                 ),
                                 onPressed: _isListening ? _stopListening : _startListening,
                               ),
@@ -645,8 +593,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                             maxLength: 1, // Limits input to one character
                             onSubmitted: (value) {
                               if (value.isNotEmpty) {
-                                _isFromSP = _apps.any((e) => e['hanja'] == value);
-                                _showHanja(value); // Show the typed Hanja
+                                _showHanja(value, false); // Show the typed Hanja
                                 _textController.clear(); // Clear the text field after submission
                               }
                             },
@@ -678,7 +625,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                                 key: _canvasKey, // Assign the key to the canvas container
                                 decoration: BoxDecoration(
                                   color: Colors.grey[200],
-                                  border: Border.all(color: Colors.green, width: 4.0),
+                                  border: Border.all(color: Color(0xFFDB7890), width: 4.0),
                                   borderRadius: BorderRadius.circular(8.0),
                                 ),
                                 child: CustomPaint(
@@ -732,14 +679,8 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                           spacing: 8.0,
                           children: _recognizedHanja.map((hanja) {
                             return TextButton(
-                              onPressed: () {
-                                _simpleToTraditional(hanja.trim());
-                                _showHanja(hanja.trim());
-                              },
-                              child: Text(
-                                hanja,
-                                style: TextStyle(fontSize: 18)
-                              ),
+                              onPressed: () => _showHanja(hanja.trim(), false),
+                              child: StyledHanja(text: hanja),
                             );
                           }).toList(),
                         ),
@@ -793,7 +734,7 @@ class HandwritingPainter extends CustomPainter {
     );
 
     final paint = Paint()
-      ..color = Colors.black
+      ..color = Color(0xFFE392A3)
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 15.0;
 
@@ -847,29 +788,9 @@ class CustomListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Stack(
-          children: [
-            Text(
-              "$hanja ",
-              style: TextStyle(
-                fontSize: 50,
-                fontFamily: 'HanyangHaeseo',
-                foreground: Paint()
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = 2 // Border thickness
-                  ..color = Color(0xFFDB7890), // Border color
-              ),
-            ),
-            // Main text
-            Text(
-              "$hanja ",
-              style: const TextStyle(
-                fontSize: 50,
-                fontFamily: 'HanyangHaeseo',
-                color: Color(0xFFE392A3), // Text color
-              ),
-            ),
-          ],
+        StyledHanja(
+          text: "$hanja ",
+          fontSize: 50,
         ),
         Expanded(
           child: Column(

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../styled_hanja.dart';
 
 class Tab2 extends StatefulWidget {
   final Map<String, dynamic> dict;
@@ -18,15 +19,14 @@ class Tab2 extends StatefulWidget {
 }
 
 class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
-  static const platform = MethodChannel('com.example.hanja_magic/apps');
+  static const _platform = MethodChannel('com.example.hanja_magic/apps');
   final List<Map<String, String>> _apps = [];
-  final TextEditingController nameController = TextEditingController();
-  List<String> installedAppNames = [];
+  List<String> _installedAppNames = [];
   List<HanjaEntry> _allHanjaEntries = [];
-  bool isLoading = true;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   bool _isAnimationComplete = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -38,10 +38,10 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
         _loadApps().then((_) {
           // 최소 1초 애니메이션이 완료된 후 로딩 상태를 업데이트
           if (_isAnimationComplete) {
-            setState(() => isLoading = false);
+            setState(() => _isLoading = false);
           } else {
             Future.delayed(const Duration(milliseconds: 700), () {
-              setState(() => isLoading = false);
+              setState(() => _isLoading = false);
             });
           }
         });
@@ -78,8 +78,8 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
 
   Future<void> _fetchInstalledAppNames() async {
     try {
-      final List<dynamic> names = await platform.invokeMethod('getInstalledAppNames');
-      setState(() => installedAppNames = names.cast<String>());
+      final List<dynamic> names = await _platform.invokeMethod('getInstalledAppNames');
+      setState(() => _installedAppNames = names.cast<String>());
     } on PlatformException catch (_) {}
   }
 
@@ -141,14 +141,18 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
     String kor,
     String extraData
   ) async {
-    if (!installedAppNames.any(
+    if (!_installedAppNames.any(
       (name) => name.toLowerCase() == appName.toLowerCase())) {
-      ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$appName을(를) 찾을 수 없습니다.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$appName을(를) 찾을 수 없습니다.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
       return;
     }
     try {
-      final info = await platform.invokeMethod(
+      final info = await _platform.invokeMethod(
         'getSingleAppInfoByName',
         {'appName': appName},
       );
@@ -168,30 +172,42 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
         });
       });
       await _saveApps();
-      ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$name을(를) 추가했습니다.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$name을(를) 추가했습니다.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
     } on PlatformException catch (_) {
-      ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$appName을(를) 추가하는 데 실패했습니다.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$appName을(를) 추가하는 데 실패했습니다.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
     }
   }
 
   Future<void> _launchApp(String packageName, String? extraData) async {
     try {
-      final success = await platform.invokeMethod(
+      final success = await _platform.invokeMethod(
         'launchApp',
         {'packageName': packageName, 'extraData': extraData ?? "",}
       );
       if (!success) {
-        ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$packageName을(를) 실행하는 데 실패했습니다.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$packageName을(를) 실행하는 데 실패했습니다.'),
+            duration: Duration(seconds: 1),
+          ),
+        );
       }
     } on PlatformException catch (_) {}
   }
 
   void showAppSearchDialog(BuildContext context) async {
     // 설치된 앱 리스트 가져오기
-    List<String> installedApps = installedAppNames;
+    List<String> installedApps = _installedAppNames;
 
     showDialog(
       context: context,
@@ -216,7 +232,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
           // 한자/뜻/음/주문 컨트롤러
           TextEditingController combinedController = TextEditingController();
           TextEditingController spellController = TextEditingController();
-          TextEditingController additiveController = TextEditingController();
+          TextEditingController extraController = TextEditingController();
 
           // 검색 결과용 임시 리스트
           List<HanjaEntry> filteredEntries = List.from(_allHanjaEntries);
@@ -236,6 +252,10 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
           showDialog(
             context: context,
             builder: (BuildContext context) {
+              String? selectedHanja;
+              String? selectedDef;
+              String? selectedKor;
+
               return StatefulBuilder(
                 builder: (BuildContext context, StateSetter setState) {
                   return Dialog(
@@ -248,9 +268,18 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                           // 상단 검색 창
                           TextField(
                             controller: searchController,
+                            cursorColor: Color(0xFFDB7890),
                             decoration: InputDecoration(
                               labelText: '한자 검색 (뜻+음)',
-                              border: OutlineInputBorder(),
+                              labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                              floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                              border: OutlineInputBorder(), // Default border
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                              ),
                             ),
                             onChanged: (value) {
                               filterHanja(value, setState);
@@ -264,15 +293,26 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                               itemCount: filteredEntries.length,
                               itemBuilder: (context, index) {
                                 final entry = filteredEntries[index];
+                                final isRegistered = (
+                                  _apps.any((app) => app['hanja'] == entry.hanja) ||
+                                  widget.defaultHanjas.containsKey(entry.hanja)
+                                );
                                 return ListTile(
                                   title: Text(
                                     '${entry.hanja} ${entry.def} ${entry.kor}',
+                                    style: TextStyle(
+                                      color: isRegistered ? Colors.grey : Colors.black,
+                                    ),
                                   ),
                                   onTap: () {
-                                    // 한자/뜻/음/주문을 TextField에 세팅
-                                    combinedController.text =
-                                    '${entry.hanja} ${entry.def} ${entry.kor}';
-                                    spellController.text = entry.spell ?? '';
+                                    if (!isRegistered) {
+                                      // 한자/뜻/음/주문을 TextField에 세팅
+                                      combinedController.text = '${entry.hanja} ${entry.def} ${entry.kor}';
+                                      spellController.text = entry.spell ?? '';
+                                      selectedHanja = entry.hanja;
+                                      selectedDef = entry.def;
+                                      selectedKor = entry.kor;
+                                    }
                                   },
                                 );
                               },
@@ -294,79 +334,65 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                           // 주문(spell)만 수정 가능
                           TextField(
                             controller: spellController,
+                            cursorColor: Color(0xFFDB7890),
                             decoration: InputDecoration(
                               labelText: '주문',
-                              border: OutlineInputBorder(),
+                              labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                              floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                              border: OutlineInputBorder(), // Default border
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
 
                           // 추가 데이터 입력 필드 (조건부 렌더링)
-                          if (appName == "전화" || appName == "삼성 인터넷")
+                          if (appName == "전화" || appName == "삼성 인터넷") ...[
                             TextField(
-                              controller: additiveController,
+                              controller: extraController,
+                              cursorColor: Color(0xFFDB7890),
                               decoration: InputDecoration(
                                 labelText: '전화번호 / URL',
-                                border: OutlineInputBorder(),
+                                labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                                floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                                border: OutlineInputBorder(), // Default border
+                                enabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                                ),
                               ),
                             ),
-                          const SizedBox(height: 10),
-
+                            const SizedBox(height: 10),
+                          ],
                           // 저장 버튼
-                          ElevatedButton(
-                            onPressed: () {
+                          GestureDetector(
+                            onTap: () {
                               // 한자/뜻/음 분리 처리
-                              final combinedText = combinedController.text.trim();
-                              final parts = combinedText.split(' ');
-
-                              final selectedHanja = parts.isNotEmpty ? parts[0] : '';
-                              final selectedDef = parts.length > 1 ? parts[1] : '';
-                              final selectedKor = parts.length > 2 ? parts[2] : '';
                               final selectedSpell = spellController.text.trim();
-                              final selectedAdditive = additiveController.text.trim();
+                              final selectedExtra = extraController.text.trim();
                               
-                              if (selectedHanja == "") {
+                              if (selectedHanja == "" || widget.defaultHanjas.containsKey(selectedHanja)) {
                                 return;
                               }
-
-                              // 중복 확인
-                              final isDuplicate = _apps.any((app) => app['hanja'] == selectedHanja);
-
-                              if (isDuplicate || widget.defaultHanjas.containsKey(selectedHanja)) {
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      backgroundColor: Colors.white,
-                                      title: Text('중복 경고'),
-                                      content: Text('이미 등록한 한자입니다.'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                          child: Text('확인'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                                return;
-                              }
-
-                              Navigator.of(context).pop(); // 다이얼로그 닫기
 
                               // _addApp 호출(추가 데이터는 ""로)
                               _addApp(
                                 appName,
-                                selectedHanja,    // hanja
-                                selectedSpell,    // spell
-                                selectedDef,      // def
-                                selectedKor,      // kor
-                                selectedAdditive, // extraData
+                                selectedHanja!,
+                                selectedSpell,
+                                selectedDef!,
+                                selectedKor!,
+                                selectedExtra,
                               );
+                              Navigator.of(context).pop(); // 다이얼로그 닫기
                             },
-                            child: Text('저장'),
+                            child: StyledHanja(text: "完"),
                           ),
                         ],
                       ),
@@ -390,9 +416,18 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                     // 검색창
                     TextField(
                       controller: searchController,
+                      cursorColor: Color(0xFFDB7890),
                       decoration: InputDecoration(
                         labelText: '검색',
-                        border: OutlineInputBorder(),
+                        labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                        floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                        border: OutlineInputBorder(), // Default border
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                        ),
                       ),
                       onChanged: (value) {
                         filterApps(value, setState);
@@ -417,8 +452,8 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                     ),
                     SizedBox(height: 10),
                     // 추가 버튼
-                    ElevatedButton(
-                      onPressed: () {
+                    GestureDetector(
+                      onTap: () {
                         final name = searchController.text.trim();
                         searchController.clear();
                         if (name.isNotEmpty) {
@@ -426,7 +461,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                           showHanjaDialog(name);
                         }
                       },
-                      child: Text('다음'),
+                      child: StyledHanja(text: "入"),
                     ),
                   ],
                 ),
@@ -438,78 +473,239 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
     );
   }
 
+  void showEditDialog(int index) {
+    final app = _apps[index];
+      // 검색창 컨트롤러
+    TextEditingController searchController = TextEditingController();
+
+    // 한자/뜻/음/주문 컨트롤러
+    TextEditingController combinedController = TextEditingController(text: '${app['hanja']} ${app['def']} ${app['kor']}');
+    TextEditingController spellController = TextEditingController(text: app['spell']);
+    TextEditingController extraController = TextEditingController(text: app['extraData']);
+
+    // 검색 결과용 임시 리스트
+    List<HanjaEntry> filteredEntries = List.from(_allHanjaEntries);
+
+    // 검색 로직: (def + kor)에서 공백 제거 후, 사용자가 입력한 검색어도 공백 제거 후 contains
+    void filterHanja(String query, StateSetter setState) {
+      final trimmedQuery = query.replaceAll(RegExp(r'\s+'), '');
+      setState(() {
+        filteredEntries = _allHanjaEntries.where((entry) {
+          final combined = (entry.def + entry.kor).replaceAll(RegExp(r'\s+'), '');
+          return combined.contains(trimmedQuery);
+        }).toList();
+      });
+    }
+
+    // 다이얼로그 표시
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String? selectedHanja = app['hanja'];
+        String? selectedDef = app['def'];
+        String? selectedKor = app['kor'];
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 상단 검색 창
+                    TextField(
+                      controller: searchController,
+                      cursorColor: Color(0xFFDB7890),
+                      decoration: InputDecoration(
+                        labelText: '한자 검색 (뜻+음)',
+                        labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                        floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                        border: OutlineInputBorder(), // Default border
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                        ),
+                      ),
+                      onChanged: (value) {
+                        filterHanja(value, setState);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // 검색 결과 리스트
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredEntries.length,
+                        itemBuilder: (context, index) {
+                          final entry = filteredEntries[index];
+                          final isRegistered = (
+                            _apps.any((app) => app['hanja'] == entry.hanja) ||
+                            widget.defaultHanjas.containsKey(entry.hanja)
+                          );
+                          return ListTile(
+                            title: Text(
+                              '${entry.hanja} ${entry.def} ${entry.kor}',
+                              style: TextStyle(
+                                color: isRegistered ? Colors.grey : Colors.black,
+                              ),
+                            ),
+                            onTap: () {
+                              if (!isRegistered) {
+                                // 한자/뜻/음/주문을 TextField에 세팅
+                                combinedController.text = '${entry.hanja} ${entry.def} ${entry.kor}';
+                                spellController.text = entry.spell ?? '';
+                                selectedHanja = entry.hanja;
+                                selectedDef = entry.def;
+                                selectedKor = entry.kor;
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // 선택된 한자/뜻/음 표시하는 TextField
+                    TextField(
+                      controller: combinedController,
+                      decoration: InputDecoration(
+                        labelText: '한자/뜻/음',
+                        border: OutlineInputBorder(),
+                      ),
+                      enabled: false, // 수정 불가
+                    ),
+                    const SizedBox(height: 10),
+
+                    // 주문(spell)만 수정 가능
+                    TextField(
+                      controller: spellController,
+                      cursorColor: Color(0xFFDB7890),
+                      decoration: InputDecoration(
+                        labelText: '주문',
+                        labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                        floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                        border: OutlineInputBorder(), // Default border
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // 추가 데이터 입력 필드 (조건부 렌더링)
+                    if (app['name'] == "전화" || app['name'] == "삼성 인터넷") ...[
+                      TextField(
+                        controller: extraController,
+                        cursorColor: Color(0xFFDB7890),
+                        decoration: InputDecoration(
+                          labelText: '전화번호 / URL',
+                          labelStyle: TextStyle(color: Color(0xFFDB7890)),
+                          floatingLabelStyle: TextStyle(color: Color(0xFFDB7890)),
+                          border: OutlineInputBorder(), // Default border
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Color(0xFFDB7890)), // Color when enabled
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Color(0xFFDB7890), width: 2.0), // Color when focused
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    GestureDetector(
+                      onTap: () {
+                        // 한자/뜻/음 분리 처리
+                        final selectedSpell = spellController.text.trim();
+                        final selectedExtra = extraController.text.trim();
+
+                        Map<String, String> newAppData = {
+                          'name': app['name']!,
+                          'package': app['package']!,
+                          'icon': app['icon']!,
+                          'hanja': selectedHanja!,
+                          'spell': selectedSpell,
+                          'def': selectedDef!,
+                          'kor': selectedKor!,
+                          'extraData': selectedExtra,
+                        };
+                        
+                        updateAppEntry(index, newAppData);
+                        Navigator.of(context).pop(); // 다이얼로그 닫기
+                      },
+                      child: StyledHanja(text: "完"),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void updateAppEntry(int index, Map<String, String> newAppData) {
+    setState(() => _apps[index] = newAppData);
+    _saveApps();
+  }
+
   // build에 super.build(context) 호출 필요
   // (AutomaticKeepAliveClientMixin을 사용할 때 권장)
   @override
   Widget build(BuildContext context) {
     super.build(context); // 추가
     return Scaffold(
-      appBar: isLoading
+      appBar: _isLoading
       ? null
       : AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         actions: [
           Padding(
             padding: EdgeInsets.only(right: 16),
             child: GestureDetector(
               onTap: () => showAppSearchDialog(context),
-              child: Stack(
-                children: [
-                  Text(
-                    "加",
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'HanyangHaeseo',
-                      foreground: Paint()
-                        ..style = PaintingStyle.stroke
-                        ..strokeWidth = 2 // Border thickness
-                        ..color = Color(0xFFDB7890), // Border color
-                    ),
-                  ),
-                  // Main text
-                  Text(
-                    "加",
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'HanyangHaeseo',
-                      color: Color(0xFFE392A3), // Text color
-                    ),
-                  ),
-                ],
-              ),
+              child: StyledHanja(text: "加"),
             ),
           ),
         ],
       ),
-      body: isLoading
+      body: _isLoading
           ? Stack(
-        children: [
-          Container(
-            color: Colors.white,
-          ),
-          // 집중선 이미지
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.8, // 투명도 조정
-              child: Image.asset(
-                'assets/focus.jpg',
-                fit: BoxFit.cover, // 화면 전체에 이미지 채우기
+          children: [
+            Container(
+              color: Colors.white,
+            ),
+            // 집중선 이미지
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.8, // 투명도 조정
+                child: Image.asset(
+                  'assets/focus.jpg',
+                  fit: BoxFit.cover, // 화면 전체에 이미지 채우기
+                ),
               ),
             ),
-          ),
-          // 애니메이션 이미지
-          Center(
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              child: Image.asset(
-                'assets/chunjamoon.png',
-                width: MediaQuery.of(context).size.width * 0.8,
-                height: MediaQuery.of(context).size.width * 0.8,
+            // 애니메이션 이미지
+            Center(
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Image.asset(
+                  'assets/chunjamoon.png',
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  height: MediaQuery.of(context).size.width * 0.8,
+                ),
               ),
             ),
-          ),
-        ],
-      )
+          ],
+        )
         : Column(
           children: [
             Expanded(
@@ -522,50 +718,54 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                   );
                 },
                 itemBuilder: (BuildContext context, int index) {
-                  return Dismissible(
-                    key: ValueKey(_apps[index]['hanja']),
-                    direction: DismissDirection.startToEnd,
-                    background: Container(
-                      color: Colors.red,
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.only(left: 20.0),
-                      child: const Icon(
-                        Icons.delete,
-                        color: Colors.white,
-                      ),
-                    ),
-                    onDismissed: (direction) async {
-                      final removedApp = _apps[index];
-                      setState(() => _apps.removeAt(index));
-                      await _saveApps();
-
-                      // Snackbar with "Undo"
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${removedApp['name']}을(를) 제거했습니다.'),
-                          action: SnackBarAction(
-                            label: '실행 취소',
-                            onPressed: () {
-                              setState(() => _apps.insert(index, removedApp));
-                              _saveApps();
-                            },
-                          ),
+                  return GestureDetector(
+                    onTap: () => showEditDialog(index),
+                    child: Dismissible(
+                      key: ValueKey(_apps[index]['hanja']),
+                      direction: DismissDirection.startToEnd,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.only(left: 20.0),
+                        child: const Icon(
+                          Icons.delete,
+                          color: Colors.white,
                         ),
-                      );
-                    },
-                    child: CustomListTile(
-                      hanja: _apps[index]['hanja'] ?? '',
-                      spell: _apps[index]['spell'] ?? '',
-                      def: _apps[index]['def'] ?? '',
-                      kor: _apps[index]['kor'] ?? '',
-                      icon: _buildIcon(_apps[index]['icon'] ?? ''),
-                      onTap: (_apps[index]['package'] ?? '').isNotEmpty
-                        ? () => _launchApp(
-                          _apps[index]['package']!,
-                          _apps[index]['extraData'],
-                        )
-                        : null,
+                      ),
+                      onDismissed: (direction) async {
+                        final removedApp = _apps[index];
+                        setState(() => _apps.removeAt(index));
+                        await _saveApps();
+
+                        // Snackbar with "Undo"
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${removedApp['name']}을(를) 제거했습니다.'),
+                            duration: Duration(seconds: 2),
+                            action: SnackBarAction(
+                              label: '실행 취소',
+                              onPressed: () {
+                                setState(() => _apps.insert(index, removedApp));
+                                _saveApps();
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      child: CustomListTile(
+                        hanja: _apps[index]['hanja'] ?? '',
+                        spell: _apps[index]['spell'] ?? '',
+                        def: _apps[index]['def'] ?? '',
+                        kor: _apps[index]['kor'] ?? '',
+                        icon: _buildIcon(_apps[index]['icon'] ?? ''),
+                        onTap: (_apps[index]['package'] ?? '').isNotEmpty
+                          ? () => _launchApp(
+                            _apps[index]['package']!,
+                            _apps[index]['extraData'],
+                          )
+                          : null,
+                      ),
                     ),
                   );
                 }
@@ -610,29 +810,9 @@ class CustomListTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
       child: Row(
         children: [
-          Stack(
-            children: [
-              Text(
-                "$hanja ",
-                style: TextStyle(
-                  fontSize: 50,
-                  fontFamily: 'HanyangHaeseo',
-                  foreground: Paint()
-                    ..style = PaintingStyle.stroke
-                    ..strokeWidth = 2 // Border thickness
-                    ..color = Color(0xFFDB7890), // Border color
-                ),
-              ),
-              // Main text
-              Text(
-                "$hanja ",
-                style: const TextStyle(
-                  fontSize: 50,
-                  fontFamily: 'HanyangHaeseo',
-                  color: Color(0xFFE392A3), // Text color
-                ),
-              ),
-            ],
+          StyledHanja(
+            text: "$hanja ",
+            fontSize: 50,
           ),
           Expanded(
             child: Column(

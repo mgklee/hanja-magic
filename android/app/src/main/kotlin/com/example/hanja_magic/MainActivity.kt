@@ -209,7 +209,9 @@ class MainActivity : FlutterActivity() {
                         false
                     }
                 } else {
-                    false
+                    val intent = Intent(Intent.ACTION_DIAL)
+                    startActivity(intent)
+                    true
                 }
             }
             "com.sec.android.app.sbrowser" -> {
