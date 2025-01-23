@@ -358,6 +358,30 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
             orElse: () => {"hanja": ""}, // What to return if no match is found
           );
 
+          if (_selectedHanja == "喝") {
+            showDialog(
+              context: context,
+              builder: (context) {
+                // 2초 뒤 자동 닫힘
+                Future.delayed(const Duration(seconds: 2), () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                });
+
+                return Dialog(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset('assets/gaal.jpg'), // 이미지 표시
+                    ],
+                  ),
+                );
+              },
+            );
+          }
+
+
           // defaultHanjaMagic(_selectedHanja);
           if (widget.defaultHanjas[_selectedHanja] != null) {
             await platform.invokeMethod(widget.defaultHanjas[_selectedHanja]!["method"]!);
@@ -674,23 +698,30 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     ),
                     if (_recognizedHanja.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Wrap(
-                          spacing: 8.0,
-                          children: _recognizedHanja.map((hanja) {
-                            return TextButton(
-                              onPressed: () => _showHanja(hanja.trim(), false),
-                              child: StyledHanja(text: hanja),
-                            );
-                          }).toList(),
+                        padding: const EdgeInsets.only(top: 16.0, left: 24.0),
+                          child: Wrap(
+                            spacing: 0.0,
+                            runSpacing: 0.0,
+                            alignment: WrapAlignment.center,
+                            children: _recognizedHanja.map((hanja) {
+                              return SizedBox(
+                                width: (MediaQuery.of(context).size.width - 32) / 5,
+                                child: TextButton(
+                                  onPressed: () => _showHanja(hanja.trim(), false),
+                                  child: StyledHanja(
+                                    text: hanja,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      ),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            ],
-          ),
-          ),
           ),
         ],
       ),
