@@ -1,16 +1,70 @@
-# hanja_magic
+# 1. 槪要 (개요)
 
-A new Flutter project.
+## 1.1. 硏究 紹介 (연구 소개)
 
-## Getting Started
+💡 『마법천자문』의 주인공 손오공처럼 한자마법을 쓰고 싶었던 적 다들 있지 않으신가요?
 
-This project is a starting point for a Flutter application.
+그런 분들을 위해 저희가 **마법천자폰**을 창제(創製)했습니다!
 
-A few resources to get you started if this is your first Flutter project:
+## 1.2. 技術 (기술)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- **前端 (Front-End):** Flutter
+- **統合開發環境 (IDE):** Visual Studio Code
+- **協業 (Version Control):** GitHub
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 1.3. 感謝 (Acknowledgement)
+
+- 한자 필기 인식은 다음 모델을 Tensorflow Lite로 전환하여 사용했습니다.
+- 한글-한자 DB는 다음 저장소에서 제공하는 것을 일부 수정하여 사용했습니다.
+
+# 2. 構成員 紹介 (구성원 소개)
+
+## 이명규 (李明揆)
+
+- 韓國科學技術院 電算學部 20學番
+- KAIST 전산학부 20학번 
+- https://github.com/mgklee
+
+## 조어진 (趙御晋)
+
+- 蔚山科學技術院 컴퓨터工學部 20學番
+- UNIST 컴퓨터공학과 20학번
+- https://github.com/gutsguy
+
+# 3. 機能 紹介 (기능 소개)
+
+## 3.1. 第一窓 (Tab 1)
+
+- 화면 중앙 캔버스에 한자(간체자만 인식)를 쓰고 검색 버튼(돋보기)을 누르면 내장된 모델이 필기를 인식하여 후보 다섯 자를 보여줍니다.
+- 뒤로 가기 버튼을 눌러 가장 마지막으로 쓴 획을 지울 수 있고, X 버튼을 눌러 모든 획을 지울 수 있습니다.
+- 한자를 선택하면 손오공이 화면 아래에서 올라오며 주문과 뜻, 음을 읽어주고, 연결된 앱이 있으면 실행합니다.
+- 캔버스 위 검색창의 마이크를 누르고 주문을 외워 한자를 선택할 수 있습니다.
+- 삼성 키보드에서 필기를 인식하여 검색창에 바로 한자를 입력할 수 있습니다.
+- 화면 우상단 “알릴 고(告)” 자를 누르면 기본 기능 목록을 볼 수 있습니다.
+
+## 3.2. 第二窓 (Tab 2)
+
+- Tab 2는 마법천자문에 적힌 한자마법 목록을 직접 보고, 추가하거나 수정할 수 있습니다.
+- 한자마법은 최대 1,000개까지 기록할 수 있으며, 우측으로 밀어 삭제하거나 앱 아이콘을 눌러 바로 실행할 수 있습니다.
+- 화면 우상단 “더할 가(加)” 자를 누르면 원하는 한자에 앱을 연결하여 추가할 수 있습니다.
+    - 먼저 설치된 앱 중에 원하는 앱을 선택합니다.
+    - 다음으로 원하는 한자를 선택합니다.
+    - 만약 선택한 한자가 『마법천자문』에 나온 한자라면, 자동으로 주문이 입력됩니다.
+    - 주문은 다시 수정할 수 있습니다.
+- 추가한 한자마법을 다시 누르면 한자와 주문을 수정할 수 있습니다.
+
+## 3.3 用例 (용례)
+
+“열려라! 열 개(開)” 마법으로 출입문을 여는 모습
+
+# 4. 後記 (후기)
+
+## 이명규 (李明揆)
+
+> 유치(幼稚)한 주제(主題)와 아이디어(構想)에도 동고동락(同苦同樂)한 어진(御晋)에게 무한(無限)한 감사(感謝)를 전(傳)합니다.
+> 
+
+## 조어진 (趙御晋)
+
+> 다시 추억(追憶)의 시절(時節)로 돌아가 유아퇴행(幼兒退行)의 즐거움(樂)을 느꼈습니다. 이런 기획(企劃)을 제안(提案)해 주고 열심히 만들어 준 명규(明揆)에게 무한(無限)한 감사(感謝)를 전(傳)합니다.
+>
