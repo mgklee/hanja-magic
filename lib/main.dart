@@ -71,10 +71,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         highlightColor: Colors.transparent,
-        scaffoldBackgroundColor: Colors.white,
+        scaffoldBackgroundColor: Color(0xffFFFFFF),
         splashColor: Colors.transparent,
       ),
-      home: HomePage(
+      home: SplashScreenWrapper(
         dict: dict,
         smp2trd: smp2trd,
         interpreter: interpreter,
@@ -135,7 +135,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Color(0xffE3ECEC),
         currentIndex: _currentIndex,
         elevation: 0,
         onTap: (index) {
@@ -155,6 +155,67 @@ class _HomePageState extends State<HomePage> {
         ],
         showSelectedLabels: false,
         showUnselectedLabels: false,
+      ),
+    );
+  }
+}
+
+class SplashScreenWrapper extends StatefulWidget {
+  final Map<String, dynamic> dict;
+  final Map<String, dynamic> smp2trd;
+  final Interpreter interpreter;
+  final List<String> labels;
+
+  const SplashScreenWrapper({
+    super.key,
+    required this.dict,
+    required this.smp2trd,
+    required this.interpreter,
+    required this.labels,
+  });
+
+  @override
+  State<SplashScreenWrapper> createState() => _SplashScreenWrapperState();
+}
+
+class _SplashScreenWrapperState extends State<SplashScreenWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    _navigateToHome();
+  }
+
+  void _navigateToHome() async {
+    await Future.delayed(Duration(milliseconds: 1500));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomePage(
+          dict: widget.dict,
+          smp2trd: widget.smp2trd,
+          interpreter: widget.interpreter,
+          labels: widget.labels,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SplashScreen(); // SplashScreen 위젯 표시
+  }
+}
+
+class SplashScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white, // 배경색 설정
+      body: Center(
+        child: Image.asset(
+          'assets/chunjapae.gif', // GIF 경로
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }
