@@ -588,17 +588,14 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                       ),
                     ),
                     if (_recognizedHanja.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Wrap(
-                          spacing: 8.0,
-                          children: _recognizedHanja.map((hanja) {
-                            return TextButton(
-                              onPressed: () => _showHanja(hanja.trim(), false),
-                              child: StyledHanja(text: hanja),
-                            );
-                          }).toList(),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: _recognizedHanja.map((hanja) {
+                          return TextButton(
+                            onPressed: () => _showHanja(hanja.trim(), false),
+                            child: StyledHanja(text: hanja.trim()),
+                          );
+                        }).toList(),
                       ),
                   ],
                 ),
