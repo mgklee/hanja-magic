@@ -688,7 +688,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
               child: Opacity(
                 opacity: 0.8, // 투명도 조정
                 child: Image.asset(
-                  'assets/focus.jpg',
+                  'assets/images/focus.jpg',
                   fit: BoxFit.cover, // 화면 전체에 이미지 채우기
                 ),
               ),
@@ -698,7 +698,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
               child: ScaleTransition(
                 scale: _scaleAnimation,
                 child: Image.asset(
-                  'assets/chunjamoon.png',
+                  'assets/images/cheonjamun.png',
                   width: MediaQuery.of(context).size.width * 0.8,
                   height: MediaQuery.of(context).size.width * 0.8,
                 ),
@@ -713,7 +713,7 @@ class _Tab2State extends State<Tab2> with AutomaticKeepAliveClientMixin, SingleT
                 itemCount: _apps.length,
                 separatorBuilder: (BuildContext context, int index) {
                   return Image.asset(
-                    'assets/yeo.png',
+                    'assets/images/yeouipil.png',
                     width: 600,
                   );
                 },

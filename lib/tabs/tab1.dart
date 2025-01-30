@@ -73,7 +73,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1), // Start below the screen
-      end: Offset.zero, // End at original position
+      end: const Offset(0, 0.5), // End at original position
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
@@ -373,7 +373,7 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset('assets/gaal.jpg'), // 이미지 표시
+                      Image.asset('assets/images/gal.jpg'), // 이미지 표시
                     ],
                   ),
                 );
@@ -399,12 +399,6 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
       );
     });
   }
-
-  // Future<void> defaultHanjaMagic(String hanja) async {
-  //   if (widget.defaultHanjas[hanja] != null) {
-  //     await platform.invokeMethod(widget.defaultHanjas[hanja]!["method"]!);
-  //   }
-  // }
 
   void showInfoDialog(BuildContext context) {
     showDialog(
@@ -475,113 +469,10 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
               child: StyledHanja(text: "告"),
             ),
           ),
-          Center(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.93,
-                  child: _selectedHanja.isNotEmpty
-                    ? Stack(
-                    children: [
-                      Padding(
-                      padding: const EdgeInsets.only(bottom: 150),
-                      child: ScaleTransition(
-                        scale: _scaleAnimation,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Stack(
-                              children: [
-                                // Text with border effect
-                                Text(
-                                  _selectedHanja,
-                                  style: TextStyle(
-                                    fontSize: 300,
-                                    fontFamily: 'HanyangHaeseo',
-                                    fontWeight: FontWeight.bold,
-                                    foreground: Paint()
-                                      ..style = PaintingStyle.stroke
-                                      ..strokeWidth = 4 // Border thickness
-                                      ..color = specialHanjas.contains(_selectedHanja)
-                                        ? Color(0xFF80B23D)
-                                        : Color(0xFFDB7890), // Border color
-                                  ),
-                                ),
-                                // Main text
-                                Text(
-                                  _selectedHanja,
-                                  style: TextStyle(
-                                    fontSize: 300,
-                                    fontFamily: 'HanyangHaeseo',
-                                    fontWeight: FontWeight.bold,
-                                    color: specialHanjas.contains(_selectedHanja)
-                                      ? Color(0xFFA6CB5B)
-                                      : Color(0xFFE392A3), // Text color
-                                  ),
-                                ),
-                              ],
-                            ),
-                            ...?(
-                              _isFromSP
-                                ? _apps.where((e) => e['hanja'] == _selectedHanja)
-                                : widget.dict[_selectedHanja] ?? []
-                            ).map((e) {
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (e["spell"] != null)
-                                    Text(
-                                      "${e["spell"]} ",
-                                      style: const TextStyle(
-                                        fontSize: 30,
-                                        fontFamily: 'YunGothic',
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        "${e["def"]} ",
-                                        style: const TextStyle(
-                                          fontSize: 40,
-                                          fontFamily: 'YunGothic',
-                                          color: Color(0xFF0177C4),
-                                        ),
-                                      ),
-                                      Text(
-                                        "${e["kor"]}",
-                                        style: const TextStyle(
-                                          fontSize: 40,
-                                          fontFamily: 'YunGothic',
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFF0177C4),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            }) ?? [],
-                          ],
-                        ),
-                      ),
-                      ),
-                      Positioned( // SlideTransition의 위치를 지정
-                        top: 600, // 원하는 y좌표 (수직 위치)
-                        left: 0, // 원하는 x좌표 (수평 위치)
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: Image.asset(
-                            'assets/wukong.png',
-                            width: 300,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
+          if (_selectedHanja.isEmpty)
+            Center(
+              child: SingleChildScrollView(
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SizedBox(
@@ -698,31 +589,119 @@ class _Tab1State extends State<Tab1> with SingleTickerProviderStateMixin {
                     ),
                     if (_recognizedHanja.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 16.0, left: 24.0),
-                          child: Wrap(
-                            spacing: 0.0,
-                            runSpacing: 0.0,
-                            alignment: WrapAlignment.center,
-                            children: _recognizedHanja.map((hanja) {
-                              return SizedBox(
-                                width: (MediaQuery.of(context).size.width - 32) / 5,
-                                child: TextButton(
-                                  onPressed: () => _showHanja(hanja.trim(), false),
-                                  child: StyledHanja(
-                                    text: hanja,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                        padding: const EdgeInsets.all(8.0),
+                        child: Wrap(
+                          spacing: 8.0,
+                          children: _recognizedHanja.map((hanja) {
+                            return TextButton(
+                              onPressed: () => _showHanja(hanja.trim(), false),
+                              child: StyledHanja(text: hanja),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          if (_selectedHanja.isNotEmpty) ...[
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Stack(
+                      children: [
+                        // Text with border effect
+                        Text(
+                          _selectedHanja,
+                          style: TextStyle(
+                            fontSize: 300,
+                            fontFamily: 'HanyangHaeseo',
+                            fontWeight: FontWeight.bold,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 4 // Border thickness
+                              ..color = specialHanjas.contains(_selectedHanja)
+                                  ? Color(0xFF80B23D)
+                                  : Color(0xFFDB7890), // Border color
+                          ),
+                        ),
+                        // Main text
+                        Text(
+                          _selectedHanja,
+                          style: TextStyle(
+                            fontSize: 300,
+                            fontFamily: 'HanyangHaeseo',
+                            fontWeight: FontWeight.bold,
+                            color: specialHanjas.contains(_selectedHanja)
+                                ? Color(0xFFA6CB5B)
+                                : Color(0xFFE392A3), // Text color
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    ...?(
+                        _isFromSP
+                            ? _apps.where((e) => e['hanja'] == _selectedHanja)
+                            : widget.dict[_selectedHanja] ?? []
+                    ).map((e) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (e["spell"] != null)
+                            Text(
+                              "${e["spell"]} ",
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontFamily: 'YunGothic',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "${e["def"]} ",
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontFamily: 'YunGothic',
+                                  color: Color(0xFF0177C4),
+                                ),
+                              ),
+                              Text(
+                                "${e["kor"]}",
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontFamily: 'YunGothic',
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0177C4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }) ?? [],
+                  ],
+                ),
               ),
             ),
-          ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Image.asset(
+                  'assets/images/wukong.png',
+                  width: 300,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

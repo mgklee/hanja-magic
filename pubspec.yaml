@@ -74,21 +74,19 @@ flutter:
   #   - images/a_dot_ham.jpeg
   assets:
     - assets/dict.json
-    - assets/smp2trd.json
-    - assets/model.tflite
     - assets/labels.txt
-    - assets/wukong.png
-    - assets/yeo.png
-    - assets/chunjamoon.png
-    - assets/chunjapae.gif
-    - assets/focus.jpg
-    - assets/gaal.jpg
-    - assets/gaal.mp3
-    - assets/fonts/UNI_HSR.ttf
+    - assets/model.tflite
+    - assets/smp2trd.json
+    - assets/images/cheonjamun.png
+    - assets/images/cheonjapae.gif
+    - assets/images/focus.jpg
+    - assets/images/gal.jpg
+    - assets/images/wukong.png
+    - assets/images/yeouipil.png
     - assets/fonts/HANYGO230.ttf
     - assets/fonts/HANYGO250.ttf
     - assets/fonts/HANYoonGothic760.ttf
-
+    - assets/fonts/UNI_HSR.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

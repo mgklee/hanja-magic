@@ -189,7 +189,7 @@ class SplashScreen extends StatelessWidget {
       backgroundColor: Colors.white, // 배경색 설정
       body: Center(
         child: Image.asset(
-          'assets/chunjapae.gif', // GIF 경로
+          'assets/images/cheonjapae.gif', // GIF 경로
           fit: BoxFit.contain,
         ),
       ),
